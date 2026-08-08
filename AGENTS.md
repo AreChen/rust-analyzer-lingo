@@ -21,6 +21,7 @@ Run these from the repository root:
 - Build the Windows proxy: `cargo build --release --manifest-path proxy/Cargo.toml`
 - Copy the release proxy before packaging: `Copy-Item proxy/target/release/rust-analyzer-lingo-proxy.exe bin/rust-analyzer-lingo-proxy.exe -Force`
 - Package the VSIX: `npm run package`
+- Publish a release: push a tag matching the package version, for example `git tag v0.1.0` followed by `git push origin v0.1.0`
 
 `npm run package` compiles TypeScript and invokes `vsce package`. In the maintained development environment, external commands are prefixed with `rtk` according to the global agent instructions.
 
@@ -33,6 +34,7 @@ Run these from the repository root:
 - `proxy/Cargo.toml` - Rust proxy manifest and `serde_json` dependency.
 - `bin/rust-analyzer-lingo-proxy.exe` - Windows x64 binary included in the VSIX.
 - `package.json` - Extension manifest, commands, configuration keys, and npm scripts.
+- `.github/workflows/release.yml` - Windows x64 CI, VSIX packaging, artifact upload, and tag-based GitHub Release workflow.
 - `README.md` - English-only project landing page.
 - `docs/README.zh-CN.md` - Simplified Chinese user documentation.
 
@@ -64,6 +66,7 @@ Run these from the repository root:
 - For TypeScript, catalog, or manifest changes, run `npm run check` and `npm run compile`.
 - For proxy changes, run `cargo check --manifest-path proxy/Cargo.toml` and rebuild `bin/rust-analyzer-lingo-proxy.exe` before packaging.
 - For release/package changes, run `npm run package` and inspect the VSIX file list for the expected `bin/` and `dist/` contents.
+- For workflow changes, verify that the tag format and `package.json` version check remain aligned before pushing a release tag.
 - For catalog changes, verify the catalog against the local stable Rust error-code HTML directory.
 - Report any platform limitation, unavailable test, or unresolved packaging warning instead of hiding it.
 

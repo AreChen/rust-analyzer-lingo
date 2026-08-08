@@ -1,0 +1,92 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Windows x64 VSIX
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Check and build native proxy
+        shell: pwsh
+        run: |
+          cargo check --manifest-path proxy\Cargo.toml
+          cargo build --release --manifest-path proxy\Cargo.toml
+          Copy-Item `
+            -LiteralPath 'proxy\target\release\rust-analyzer-lingo-proxy.exe' `
+            -Destination 'bin\rust-analyzer-lingo-proxy.exe' `
+            -Force
+
+      - name: Check TypeScript
+        run: npm run check
+
+      - name: Package VSIX
+        run: npm run package
+
+      - name: Verify package version and VSIX
+        shell: pwsh
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          $manifest = Get-Content -Raw -LiteralPath 'package.json' | ConvertFrom-Json
+          $vsix = @(Get-ChildItem -LiteralPath '.' -Filter '*.vsix')
+
+          if ($vsix.Count -ne 1) {
+            throw "Expected exactly one VSIX, found $($vsix.Count)."
+          }
+
+          if ($env:REF_TYPE -eq 'tag') {
+            $tagVersion = $env:REF_NAME -replace '^v', ''
+            if ($manifest.version -ne $tagVersion) {
+              throw "Git tag $($env:REF_NAME) does not match package.json version $($manifest.version)."
+            }
+          }
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-analyzer-lingo-vsix
+          path: "*.vsix"
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          $vsix = Get-ChildItem -LiteralPath '.' -Filter '*.vsix' | Select-Object -First 1
+          gh release create $env:REF_NAME $vsix.FullName `
+            --repo $env:GITHUB_REPOSITORY `
+            --title "rust-analyzer-lingo $env:REF_NAME" `
+            --generate-notes

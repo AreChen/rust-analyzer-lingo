@@ -4,6 +4,7 @@
     A multilingual diagnostic companion for Rust in VS Code.
   </p>
   <p align="center">
+    <a href="https://github.com/AreChen/rust-analyzer-lingo/actions/workflows/release.yml"><img src="https://github.com/AreChen/rust-analyzer-lingo/actions/workflows/release.yml/badge.svg" alt="Build and release"></a>
     <a href="https://marketplace.visualstudio.com/">VS Code Extension</a>
     ·
     <a href="https://github.com/AreChen/rust-analyzer-lingo/issues">Issues</a>
@@ -118,6 +119,19 @@ npm run package
 The error-code catalog lives in [`src/error-codes.ts`](src/error-codes.ts). Compare its keys with the `E*.html` files under the active Rust toolchain's `share/doc/rust/html/error_codes` directory whenever the Rust toolchain changes. Keep the catalog complete even when an entry is retired or no longer emitted.
 
 Generated files such as `dist/`, `proxy/target/`, `node_modules/`, and VSIX packages are not source files and should not be committed.
+
+## Build and release
+
+GitHub Actions checks pull requests and pushes to `main` on a Windows x64 runner. It compiles the Rust proxy, runs the TypeScript check, builds the VSIX, and uploads the package as a workflow artifact. The workflow is defined in [`.github/workflows/release.yml`](.github/workflows/release.yml).
+
+To publish a release, make the tag match the version in `package.json`, then push it:
+
+```powershell
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+A `v*` tag creates a GitHub Release automatically and attaches the generated VSIX. You can also run the workflow manually from the Actions tab; manual runs build and upload an artifact without creating a release.
 
 ## Roadmap
 

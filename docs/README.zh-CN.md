@@ -111,6 +111,24 @@ npm run package
 
 生成的 `dist/`、`proxy/target/`、`node_modules/` 和 VSIX 文件都是构建产物，不要当作源文件提交。
 
+## GitHub 自动构建与发版
+
+工作流位于 [`.github/workflows/release.yml`](../.github/workflows/release.yml)。Pull Request 和推送到 `main` 时，GitHub Actions 会在 Windows x64 环境中：
+
+1. 安装 Node.js 和稳定版 Rust。
+2. 编译原生 LSP 代理。
+3. 执行 TypeScript 检查。
+4. 生成 VSIX 并保存为工作流 Artifact。
+
+需要正式发版时，让 Git 标签版本与 `package.json` 中的版本一致，然后推送标签：
+
+```powershell
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+推送 `v*` 标签后，工作流会自动创建 GitHub Release，并把生成的 `rust-analyzer-lingo-0.1.0.vsix` 附加到 Release。也可以在 Actions 页面手动运行工作流；手动运行只构建 Artifact，不会创建 Release。
+
 ## 后续计划
 
 - 增加语言选择按钮和英语语言包。
