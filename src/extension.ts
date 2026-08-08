@@ -7,9 +7,9 @@ import {
   translateDiagnostic
 } from "./translation";
 
-const EXTENSION_SOURCE = "rust-analyzer-zh";
+const EXTENSION_SOURCE = "rust-analyzer-lingo";
 const PREVIOUS_NATIVE_SETTINGS_KEY = "previousNativeHoverSettings";
-const REAL_SERVER_ENV = "RUST_ANALYZER_ZH_REAL_SERVER";
+const REAL_SERVER_ENV = "RUST_ANALYZER_LINGO_REAL_SERVER";
 const RUST_DIAGNOSTIC_SOURCES = new Set([
   "rust-analyzer",
   "rustc",
@@ -48,7 +48,7 @@ function getProxyPath(context: vscode.ExtensionContext): string | undefined {
   const proxyPath = path.join(
     context.extensionPath,
     "bin",
-    "rust-analyzer-zh-proxy.exe"
+    "rust-analyzer-lingo-proxy.exe"
   );
   return fs.existsSync(proxyPath) ? proxyPath : undefined;
 }
@@ -82,7 +82,7 @@ async function enableNativeChineseHover(
   const proxyPath = getProxyPath(context);
   if (!proxyPath) {
     void vscode.window.showErrorMessage(
-      "当前系统暂未提供 rust-analyzer-zh 的原生 Hover 代理；目前只支持 Windows x64。"
+      "当前系统暂未提供 rust-analyzer-lingo 的原生 Hover 代理；目前只支持 Windows x64。"
     );
     return;
   }
@@ -126,7 +126,7 @@ async function disableNativeChineseHover(
     PREVIOUS_NATIVE_SETTINGS_KEY
   );
   if (!previous) {
-    void vscode.window.showInformationMessage("当前没有 rust-analyzer-zh 保存的原生 Hover 配置。");
+    void vscode.window.showInformationMessage("当前没有 rust-analyzer-lingo 保存的原生 Hover 配置。");
     return;
   }
 
@@ -396,10 +396,10 @@ export function activate(context: vscode.ExtensionContext): void {
   };
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("rustAnalyzerZh.enableNativeChineseHover", () =>
+    vscode.commands.registerCommand("rustAnalyzerLingo.enableNativeChineseHover", () =>
       enableNativeChineseHover(context)
     ),
-    vscode.commands.registerCommand("rustAnalyzerZh.disableNativeChineseHover", () =>
+    vscode.commands.registerCommand("rustAnalyzerLingo.disableNativeChineseHover", () =>
       disableNativeChineseHover(context)
     ),
     bilingualDiagnostics,
@@ -482,7 +482,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      "rustAnalyzerZh.explainCurrentDiagnostic",
+      "rustAnalyzerLingo.explainCurrentDiagnostic",
       async () => {
         const editor = vscode.window.activeTextEditor;
         if (!editor || editor.document.languageId !== "rust") {

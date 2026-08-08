@@ -1,8 +1,8 @@
 [package]
-name = "rust-analyzer-zh-proxy"
-version = "0.0.4"
+name = "rust-analyzer-lingo-proxy"
+version = "0.1.0"
 edition = "2021"
-description = "LSP diagnostic proxy for rust-analyzer-zh"
+description = "LSP diagnostic proxy for rust-analyzer-lingo"
 license = "MIT"
 
 [dependencies]

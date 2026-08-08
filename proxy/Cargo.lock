@@ -33,8 +33,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust-analyzer-zh-proxy"
-version = "0.0.4"
+name = "rust-analyzer-lingo-proxy"
+version = "0.1.0"
 dependencies = [
  "serde_json",
 ]

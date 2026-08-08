@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run rust-analyzer-zh Extension",
+      "name": "Run rust-analyzer-lingo Extension",
       "type": "extensionHost",
       "request": "launch",
       "args": [

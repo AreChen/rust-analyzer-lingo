@@ -1,214 +1,135 @@
-<div align="center">
-
-# rust-analyzer-zh
-
-**A multilingual-ready diagnostic experience for Rust in VS Code.**
-
-Translate Rust compiler and `rust-analyzer` diagnostics into clear, practical Chinese—without changing the code you write.
-
-<p>
-  <a href="#english"><strong>English</strong></a>
-  &nbsp;·&nbsp;
-  <a href="#中文"><strong>中文</strong></a>
-  &nbsp;·&nbsp;
-  <a href="#roadmap"><strong>Roadmap</strong></a>
+<p align="center">
+  <h1 align="center">rust-analyzer-lingo</h1>
+  <p align="center">
+    A multilingual diagnostic companion for Rust in VS Code.
+  </p>
+  <p align="center">
+    <a href="https://marketplace.visualstudio.com/">VS Code Extension</a>
+    ·
+    <a href="https://github.com/AreChen/rust-analyzer-lingo/issues">Issues</a>
+    ·
+    <a href="LICENSE">MIT License</a>
+  </p>
+  <p align="center">
+    <a href="README.md"><img src="https://img.shields.io/badge/docs-English-2563eb?style=for-the-badge" alt="English documentation"></a>
+    <a href="docs/README.zh-CN.md"><img src="https://img.shields.io/badge/docs-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-f59e0b?style=for-the-badge" alt="Simplified Chinese documentation"></a>
+  </p>
 </p>
 
-![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.90-007ACC?logo=visualstudiocode&logoColor=white)
-![Rust](https://img.shields.io/badge/Rust-diagnostics-orange?logo=rust&logoColor=white)
-![License](https://img.shields.io/badge/license-MIT-blue)
+`rust-analyzer-lingo` adds a readable, locale-ready layer on top of the Rust diagnostics already produced by `rust-analyzer`, `rustc`, and Clippy. The current catalog is written for Simplified Chinese; the extension architecture is intentionally prepared for English and additional languages.
 
-</div>
+## Highlights
 
-<a id="english"></a>
+- Translate Rust diagnostic codes and common compiler messages into concise, beginner-friendly explanations.
+- Cover all 518 error-code pages shipped by the current stable Rust toolchain, including retired and compiler-internal entries with an explicit status message.
+- Show translated diagnostics as inline hints, extension Hover content, or additional entries in the Problems panel.
+- Preserve the original diagnostic, source range, severity, code, Rust keywords, identifiers, and code fragments.
+- Replace native `rust-analyzer` diagnostic Hover content through a transparent Windows x64 LSP proxy when you want the original Hover surface translated too.
+- Keep locale-specific content separate from the extension pipeline so future language packs can be added without rewriting the diagnostic transport layer.
 
-## English
+## Requirements
 
-> [!NOTE]
-> The native diagnostic Hover replacement currently ships as a Windows x64 proxy. The regular inline translation features work without the proxy.
+- VS Code 1.90 or newer.
+- The official [rust-analyzer extension](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer).
+- A Rust toolchain with `rustc` and `cargo` available on your PATH.
+- Native Hover replacement currently requires Windows x64. Inline hints, extension Hover, and Problems output do not require the native proxy.
 
-### What it does
+## Install
 
-`rust-analyzer-zh` is a VS Code extension for Rust learners and developers who want diagnostic explanations in Chinese while keeping Rust's original code terms, identifiers, and compiler locations intact.
+### From a VSIX
 
-It supports two complementary paths:
+Download or build a release VSIX, then install it from the VS Code command palette with **Extensions: Install from VSIX...**.
 
-| Path | Result | Platform |
-| --- | --- | --- |
-| Extension diagnostics | Chinese inline hints, custom Hover cards, Problems entries, and an explanation command | VS Code platforms supported by the extension |
-| Native Hover proxy | Translates diagnostics before the official `rust-analyzer` client renders its native Hover card | Windows x64 today |
-
-### Highlights
-
-- Chinese explanations for Rust compiler, `rust-analyzer`, and Clippy diagnostics.
-- A catalog of 283 Rust error-code titles, including the 278 active codes found in the local stable Rust 1.96 index plus five common additions.
-- Compact inline hints that keep the editor readable; long explanations stay in the Hover tooltip.
-- Optional native Hover translation through an LSP proxy, including related messages such as `expected ... found ...`, `add ... here`, and `original diagnostic`.
-- A safe enable/restore flow that remembers the previous `rust-analyzer.server.path` and `rust-analyzer.server.extraEnv` settings.
-- A language-navigation layout that can grow from English and Chinese to more locales later.
-
-### Quick start
-
-#### Install the extension
-
-If you are using a packaged VSIX:
+For a local package:
 
 ```powershell
-code --install-extension .\rust-analyzer-zh-0.0.4.vsix --force
+code --install-extension .\rust-analyzer-lingo-0.1.0.vsix --force
 ```
 
-Also install and enable the official [`rust-analyzer`](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer) extension.
+### From source
 
-#### Enable native Chinese Hover
-
-Open a Rust file, press `Ctrl+Shift+P`, and run:
-
-```text
-Rust 中文诊断：启用原生 Hover 中文替换
+```powershell
+npm install
+cargo build --release --manifest-path proxy\Cargo.toml
+Copy-Item proxy\target\release\rust-analyzer-lingo-proxy.exe bin\rust-analyzer-lingo-proxy.exe -Force
+npm run package
 ```
 
-The extension saves the current rust-analyzer server settings, points the official client at the bundled proxy, and restarts the server. Hover a red diagnostic underline to see the translated native card.
+The generated VSIX is named `rust-analyzer-lingo-0.1.0.vsix`.
 
-To restore the official server:
+## Use it
 
-```text
-Rust 中文诊断：恢复原生 Hover
-```
+Open a Rust file with a diagnostic. The default `inline` mode adds a compact translated hint at the end of the affected line. Hover the hint for the complete explanation; the original diagnostic remains available from `rust-analyzer` or `rustc`.
 
-#### Configure the extension
+Choose a display mode with the `rust-analyzer-lingo.mode` setting:
 
-```json
-{
-  "rust-analyzer-zh.mode": "inline",
-  "rust-analyzer-zh.showFallback": false,
-  "rust-analyzer-zh.inlineTextMaxLength": 32
-}
-```
+| Mode | Behavior |
+| --- | --- |
+| `inline` | Add a compact translated hint beside the source line. |
+| `hover` | Provide translated content through the extension's Hover provider. |
+| `problems` | Add translated diagnostics to the Problems panel. |
+| `both` | Enable translated Hover and Problems output together. |
 
-| Setting | Values | Default | Purpose |
-| --- | --- | --- | --- |
-| `rust-analyzer-zh.mode` | `inline`, `hover`, `problems`, `both` | `inline` | Choose where extension-generated Chinese diagnostics appear. |
-| `rust-analyzer-zh.showFallback` | `true` / `false` | `false` | Show a generic Chinese explanation for uncatalogued diagnostics. |
-| `rust-analyzer-zh.inlineTextMaxLength` | integer ≥ 8 | `32` | Limit inline hint width while keeping the full tooltip available. |
+Other settings:
 
-### How it works
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `rust-analyzer-lingo.showFallback` | `false` | Show a generic explanation when a diagnostic has no catalog entry or message rule. |
+| `rust-analyzer-lingo.inlineTextMaxLength` | `32` | Limit the visible inline hint length while keeping the full tooltip. |
 
-The extension layer reads diagnostics exposed by VS Code and creates its own Chinese presentation. The optional proxy sits between the official language client and the real `rust-analyzer` executable; non-diagnostic LSP messages are forwarded unchanged.
+The command palette also provides:
+
+- **Rust Diagnostics: Explain Current Error** - Open the translated explanation for the diagnostic at the cursor.
+- **Rust Diagnostics: Enable Native Chinese Hover Translation** - Route the bundled native `rust-analyzer` server through the Windows proxy.
+- **Rust Diagnostics: Restore Native Hover** - Restore the server path and environment settings saved before proxy activation.
+
+The native Hover command updates the selected workspace or global `rust-analyzer` settings and keeps a backup in the extension's global state. Restarting the Rust server may be required on older versions of the official `rust-analyzer` extension.
+
+## Architecture
 
 ```mermaid
-sequenceDiagram
-    participant Editor as VS Code
-    participant Proxy as rust-analyzer-zh proxy
-    participant RA as Official rust-analyzer
-
-    Editor->>Proxy: LSP request / document change
-    Proxy->>RA: Forward unchanged
-    RA-->>Proxy: Diagnostic notification or response
-    Proxy-->>Editor: Translate diagnostic text, forward the rest
-    Editor->>Editor: Render Chinese native Hover
+flowchart LR
+    A[ rust-analyzer / rustc / Clippy ] --> B[ VS Code diagnostics ]
+    B --> C[ TypeScript translation layer ]
+    C --> D[ Inline hints ]
+    C --> E[ Extension Hover ]
+    C --> F[ Problems panel ]
+    B -. native Hover mode .-> G[ Windows x64 LSP proxy ]
+    G --> H[ Original rust-analyzer server ]
+    G --> I[ Translated diagnostic messages ]
+    J[ 518-entry Rust error catalog ] --> C
+    J --> G
 ```
 
-The proxy keeps code snippets and source locations useful for debugging. Rust keywords, type names such as `i32`, identifiers, and code fragments remain unchanged because translating them would make the diagnostic harder to match to the source.
+The TypeScript layer owns VS Code presentation and locale selection. The Rust proxy speaks standard LSP framing, forwards unrelated traffic unchanged, and rewrites diagnostic messages using the packaged catalog. The proxy discovers the real server through `RUST_ANALYZER_LINGO_REAL_SERVER`.
 
-### Development
-
-Prerequisites:
-
-- Node.js and npm
-- Rust and Cargo
-- VS Code 1.90 or newer
-- The official `rust-analyzer` extension for end-to-end testing
-
-Install dependencies and run the checks:
+## Development
 
 ```powershell
 npm install
 npm run check
 npm run compile
-cargo check --manifest-path proxy/Cargo.toml
-```
-
-Build the Windows x64 proxy and package the extension:
-
-```powershell
-cargo build --release --manifest-path proxy/Cargo.toml
-Copy-Item proxy/target/release/rust-analyzer-zh-proxy.exe bin/rust-analyzer-zh-proxy.exe -Force
+cargo check --manifest-path proxy\Cargo.toml
+cargo build --release --manifest-path proxy\Cargo.toml
+Copy-Item proxy\target\release\rust-analyzer-lingo-proxy.exe bin\rust-analyzer-lingo-proxy.exe -Force
 npm run package
 ```
 
-Press `F5` in VS Code to launch the configured Extension Development Host. The proxy is intentionally packaged as a platform-specific binary for now; the extension layer remains useful on other platforms.
+The error-code catalog lives in [`src/error-codes.ts`](src/error-codes.ts). Compare its keys with the `E*.html` files under the active Rust toolchain's `share/doc/rust/html/error_codes` directory whenever the Rust toolchain changes. Keep the catalog complete even when an entry is retired or no longer emitted.
 
-### Project layout
+Generated files such as `dist/`, `proxy/target/`, `node_modules/`, and VSIX packages are not source files and should not be committed.
 
-| Path | Responsibility |
-| --- | --- |
-| `src/extension.ts` | VS Code activation, diagnostics collection, inline hints, Hover provider, commands, and settings. |
-| `src/translation.ts` | Diagnostic-code and message translation logic. |
-| `src/error-codes.ts` | Rust error-code title catalog. |
-| `proxy/src/main.rs` | JSON-RPC/LSP proxy that translates native diagnostics. |
-| `bin/rust-analyzer-zh-proxy.exe` | Packaged Windows x64 proxy binary. |
-| `package.json` | VS Code manifest, commands, settings, and npm scripts. |
-| `AGENTS.md` | Repository guidance for future coding agents. |
+## Roadmap
 
-### Roadmap
+- Add a language selector and English locale without changing the diagnostic transport layer.
+- Add more locale packs under `docs/` and the extension's translation resources.
+- Provide native proxy builds for additional platforms.
+- Expand contextual explanations while keeping inline output compact.
 
-<a id="roadmap"></a>
+## Contributing
 
-- Add a locale-neutral diagnostic model shared by every presentation layer.
-- Add English, Simplified Chinese, and additional language packs without duplicating translation logic.
-- Support portable native proxies for Linux, macOS, remote development, and WSL.
-- Expand explanations from short titles to structured beginner-friendly guidance.
-- Add automated fixture coverage for common Rust compiler and `rust-analyzer` diagnostics.
+Bug reports and translation improvements are welcome. When submitting a catalog change, include the Rust error code, the source page or toolchain version used, and a short explanation of the chosen wording. Please run the TypeScript and Rust checks before opening a pull request.
 
-### Contributing
+## License
 
-Keep translation output short enough for an editor, preserve source locations and code snippets, and add a focused fixture when changing the proxy or a common diagnostic rule. Run the TypeScript and Rust checks before packaging.
-
-### License
-
-MIT. See [`LICENSE`](LICENSE).
-
-<a id="中文"></a>
-
-## 中文
-
-### 项目简介
-
-`rust-analyzer-zh` 是一个 VS Code Rust 诊断扩展，主要面向中文 Rust 学习者。它把 Rust 编译器、`rust-analyzer` 和 Clippy 的错误提示转换成易懂的中文，同时保留关键字、类型名、变量名和代码位置，方便回到源代码中定位问题。
-
-项目分为两层：
-
-- 扩展层：提供行内中文提示、自定义 Hover、Problems 面板诊断和“解释当前错误”命令。
-- 原生 Hover 代理：在官方 `rust-analyzer` 把诊断交给 VS Code 之前翻译文本，让原生错误卡片也能显示中文。目前代理提供 Windows x64 版本。
-
-### 快速开始
-
-安装 VSIX 后打开 Rust 文件，按 `Ctrl+Shift+P`，执行：
-
-```text
-Rust 中文诊断：启用原生 Hover 中文替换
-```
-
-扩展会保存原来的 rust-analyzer 服务器配置，切换到内置代理并重启服务器。要恢复官方服务器，执行：
-
-```text
-Rust 中文诊断：恢复原生 Hover
-```
-
-### 开发命令
-
-```powershell
-npm install
-npm run check
-npm run compile
-cargo check --manifest-path proxy/Cargo.toml
-cargo build --release --manifest-path proxy/Cargo.toml
-Copy-Item proxy/target/release/rust-analyzer-zh-proxy.exe bin/rust-analyzer-zh-proxy.exe -Force
-npm run package
-```
-
-### 词典与未来多语言
-
-当前错误代码词典包含 283 项。README 顶部的语言导航已经按多语言扩展预留，后续可以增加更多语言，而不改变 Rust 代码和诊断位置的展示方式。
-
-返回顶部：<a href="#english"><strong>English</strong></a> · <a href="#roadmap"><strong>Roadmap</strong></a>
+Released under the [MIT License](LICENSE).

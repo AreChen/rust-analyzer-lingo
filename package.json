@@ -1,17 +1,17 @@
 {
-  "name": "rust-analyzer-zh",
-  "displayName": "rust-analyzer-zh",
-  "description": "Bilingual-ready Rust diagnostics for VS Code, with Chinese explanations and native Hover translation.",
-  "version": "0.0.4",
-  "publisher": "rust-analyzer-zh",
+  "name": "rust-analyzer-lingo",
+  "displayName": "rust-analyzer-lingo",
+  "description": "Multilingual Rust diagnostics for VS Code, with Chinese explanations and native Hover translation.",
+  "version": "0.1.0",
+  "publisher": "rust-analyzer-lingo",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/AreChen/rust-analyzer-zh.git"
+    "url": "https://github.com/AreChen/rust-analyzer-lingo.git"
   },
-  "homepage": "https://github.com/AreChen/rust-analyzer-zh#readme",
+  "homepage": "https://github.com/AreChen/rust-analyzer-lingo#readme",
   "bugs": {
-    "url": "https://github.com/AreChen/rust-analyzer-zh/issues"
+    "url": "https://github.com/AreChen/rust-analyzer-lingo/issues"
   },
   "engines": {
     "vscode": "^1.90.0"
@@ -26,36 +26,36 @@
   "contributes": {
     "commands": [
       {
-        "command": "rustAnalyzerZh.explainCurrentDiagnostic",
+        "command": "rustAnalyzerLingo.explainCurrentDiagnostic",
         "title": "Rust 中文诊断：解释当前错误"
       },
       {
-        "command": "rustAnalyzerZh.enableNativeChineseHover",
+        "command": "rustAnalyzerLingo.enableNativeChineseHover",
         "title": "Rust 中文诊断：启用原生 Hover 中文替换"
       },
       {
-        "command": "rustAnalyzerZh.disableNativeChineseHover",
+        "command": "rustAnalyzerLingo.disableNativeChineseHover",
         "title": "Rust 中文诊断：恢复原生 Hover"
       }
     ],
     "menus": {
       "editor/context": [
         {
-          "command": "rustAnalyzerZh.explainCurrentDiagnostic",
+          "command": "rustAnalyzerLingo.explainCurrentDiagnostic",
           "when": "editorLangId == rust",
           "group": "navigation@99"
         },
         {
-          "command": "rustAnalyzerZh.enableNativeChineseHover",
+          "command": "rustAnalyzerLingo.enableNativeChineseHover",
           "when": "editorLangId == rust",
           "group": "navigation@100"
         }
       ]
     },
     "configuration": {
-      "title": "rust-analyzer-zh",
+      "title": "rust-analyzer-lingo",
       "properties": {
-        "rust-analyzer-zh.mode": {
+        "rust-analyzer-lingo.mode": {
           "type": "string",
           "enum": [
             "inline",
@@ -72,12 +72,12 @@
           "default": "inline",
           "description": "中文诊断的显示位置。"
         },
-        "rust-analyzer-zh.showFallback": {
+        "rust-analyzer-lingo.showFallback": {
           "type": "boolean",
           "default": false,
           "description": "遇到没有错误代码或尚未收录的诊断时，是否显示通用中文提示。"
         },
-        "rust-analyzer-zh.inlineTextMaxLength": {
+        "rust-analyzer-lingo.inlineTextMaxLength": {
           "type": "integer",
           "minimum": 8,
           "default": 32,

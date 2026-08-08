@@ -8,13 +8,13 @@ use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-const REAL_SERVER_ENV: &str = "RUST_ANALYZER_ZH_REAL_SERVER";
+const REAL_SERVER_ENV: &str = "RUST_ANALYZER_LINGO_REAL_SERVER";
 
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     let Some(real_server) = find_real_server() else {
         eprintln!(
-            "rust-analyzer-zh: 找不到原始 rust-analyzer，请设置 {} 环境变量。",
+            "rust-analyzer-lingo: 找不到原始 rust-analyzer，请设置 {} 环境变量。",
             REAL_SERVER_ENV
         );
         std::process::exit(1);
@@ -28,14 +28,14 @@ fn main() {
         match status {
             Ok(status) => std::process::exit(status.code().unwrap_or(1)),
             Err(error) => {
-                eprintln!("rust-analyzer-zh: 无法启动原始 rust-analyzer：{}", error);
+                eprintln!("rust-analyzer-lingo: 无法启动原始 rust-analyzer：{}", error);
                 std::process::exit(1);
             }
         }
     }
 
     if let Err(error) = run_lsp_proxy(&real_server, &args) {
-        eprintln!("rust-analyzer-zh: LSP 代理运行失败：{}", error);
+        eprintln!("rust-analyzer-lingo: LSP 代理运行失败：{}", error);
         std::process::exit(1);
     }
 }
@@ -570,7 +570,7 @@ fn id_key(value: &Value) -> String {
 }
 
 fn debug_log(message: &str) {
-    if env::var_os("RUST_ANALYZER_ZH_DEBUG").is_some() {
-        eprintln!("rust-analyzer-zh: {}", message);
+    if env::var_os("RUST_ANALYZER_LINGO_DEBUG").is_some() {
+        eprintln!("rust-analyzer-lingo: {}", message);
     }
 }
