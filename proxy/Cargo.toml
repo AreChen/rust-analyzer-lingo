@@ -1,0 +1,9 @@
+[package]
+name = "rust-analyzer-zh-proxy"
+version = "0.0.4"
+edition = "2021"
+description = "LSP diagnostic proxy for rust-analyzer-zh"
+license = "MIT"
+
+[dependencies]
+serde_json = "1.0"

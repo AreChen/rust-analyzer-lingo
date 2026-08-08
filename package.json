@@ -1,0 +1,101 @@
+{
+  "name": "rust-analyzer-zh",
+  "displayName": "rust-analyzer-zh",
+  "description": "Bilingual-ready Rust diagnostics for VS Code, with Chinese explanations and native Hover translation.",
+  "version": "0.0.4",
+  "publisher": "rust-analyzer-zh",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AreChen/rust-analyzer-zh.git"
+  },
+  "homepage": "https://github.com/AreChen/rust-analyzer-zh#readme",
+  "bugs": {
+    "url": "https://github.com/AreChen/rust-analyzer-zh/issues"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:rust"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "rustAnalyzerZh.explainCurrentDiagnostic",
+        "title": "Rust 中文诊断：解释当前错误"
+      },
+      {
+        "command": "rustAnalyzerZh.enableNativeChineseHover",
+        "title": "Rust 中文诊断：启用原生 Hover 中文替换"
+      },
+      {
+        "command": "rustAnalyzerZh.disableNativeChineseHover",
+        "title": "Rust 中文诊断：恢复原生 Hover"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "rustAnalyzerZh.explainCurrentDiagnostic",
+          "when": "editorLangId == rust",
+          "group": "navigation@99"
+        },
+        {
+          "command": "rustAnalyzerZh.enableNativeChineseHover",
+          "when": "editorLangId == rust",
+          "group": "navigation@100"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "rust-analyzer-zh",
+      "properties": {
+        "rust-analyzer-zh.mode": {
+          "type": "string",
+          "enum": [
+            "inline",
+            "hover",
+            "problems",
+            "both"
+          ],
+          "enumDescriptions": [
+            "在错误所在行末尾显示紧凑的中文提示，并将详细中文说明放在提示的悬停卡片中。",
+            "只在鼠标悬停诊断时显示中文解释。",
+            "在 Problems 面板中追加中文诊断，原始诊断仍会保留。",
+            "同时启用悬停解释和 Problems 面板中文诊断。"
+          ],
+          "default": "inline",
+          "description": "中文诊断的显示位置。"
+        },
+        "rust-analyzer-zh.showFallback": {
+          "type": "boolean",
+          "default": false,
+          "description": "遇到没有错误代码或尚未收录的诊断时，是否显示通用中文提示。"
+        },
+        "rust-analyzer-zh.inlineTextMaxLength": {
+          "type": "integer",
+          "minimum": 8,
+          "default": 32,
+          "description": "行内中文提示的最大显示长度；完整内容仍可通过悬停提示查看。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -p ./ --watch",
+    "check": "tsc --noEmit -p ./",
+    "package": "npm run compile && vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.6.0",
+    "typescript": "^5.8.3"
+  }
+}

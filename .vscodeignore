@@ -1,0 +1,13 @@
+.vscode/**
+.vscode-test/**
+src/**
+test/**
+node_modules/**
+tsconfig.json
+*.ts
+**/*.map
+.gitignore
+proxy/**
+test-fixture/**
+test-proxy-client.js
+target/**
