@@ -1,7 +1,7 @@
 {
   "name": "rust-analyzer-lingo",
   "displayName": "rust-analyzer-lingo",
-  "description": "Multilingual Rust diagnostics for VS Code, with Chinese explanations and native Hover translation.",
+  "description": "A multilingual diagnostic layer for Rust in VS Code; Chinese is the first locale, with more languages planned.",
   "version": "0.1.0",
   "publisher": "rust-analyzer-lingo",
   "license": "MIT",
