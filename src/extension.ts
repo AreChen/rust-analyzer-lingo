@@ -10,6 +10,7 @@ import {
 const EXTENSION_SOURCE = "rust-analyzer-lingo";
 const PREVIOUS_NATIVE_SETTINGS_KEY = "previousNativeHoverSettings";
 const REAL_SERVER_ENV = "RUST_ANALYZER_LINGO_REAL_SERVER";
+const LOCALE_ENV = "RUST_ANALYZER_LINGO_LOCALE";
 const RUST_DIAGNOSTIC_SOURCES = new Set([
   "rust-analyzer",
   "rustc",
@@ -33,6 +34,33 @@ interface PreviousNativeSettings {
   serverPath: string | null;
   extraEnv: Record<string, string> | null;
   useRustcErrorCode?: boolean;
+}
+
+function getDiagnosticSourceLabel(language = vscode.env.language): string {
+  const locale = language.trim().toLowerCase().replaceAll("_", "-");
+
+  if (
+    locale.startsWith("zh-tw") ||
+    locale.startsWith("zh-hk") ||
+    locale.startsWith("zh-mo") ||
+    locale.startsWith("zh-hant")
+  ) {
+    return "Rust 中文診斷";
+  }
+  if (locale.startsWith("zh")) {
+    return "Rust 中文诊断";
+  }
+
+  const labels: ReadonlyArray<readonly [string, string]> = [
+    ["ja", "Rust 診断"],
+    ["ko", "Rust 진단"],
+    ["de", "Rust-Diagnose"],
+    ["fr", "Diagnostics Rust"],
+    ["es", "Diagnósticos de Rust"],
+    ["pt", "Diagnósticos do Rust"],
+    ["ru", "Диагностика Rust"]
+  ];
+  return labels.find(([prefix]) => locale.startsWith(prefix))?.[1] ?? "Rust Diagnostics";
 }
 
 function getWorkspaceConfigurationTarget(): vscode.ConfigurationTarget {
@@ -116,6 +144,7 @@ async function enableNativeChineseHover(
   const extraEnv = {
     ...(rustAnalyzer.get<Record<string, string> | null>("server.extraEnv", null) ?? {})
   };
+  extraEnv[LOCALE_ENV] = vscode.env.language;
   const bundledServerPath = getBundledRustAnalyzerPath();
   if (bundledServerPath) {
     extraEnv[REAL_SERVER_ENV] = bundledServerPath;
@@ -266,6 +295,7 @@ function makeProblemDiagnostic(
     entry.original.severity
   );
 
+  // 保留稳定的内部来源 ID，refreshDiagnostics 依靠它排除扩展自己创建的诊断。
   diagnostic.source = EXTENSION_SOURCE;
   diagnostic.code = entry.original.code;
   diagnostic.tags = entry.original.tags;
@@ -299,7 +329,8 @@ function makeTooltip(
   const markdown = new vscode.MarkdownString();
   markdown.isTrusted = false;
   markdown.supportHtml = false;
-  markdown.appendMarkdown("Rust 中文诊断\n\n");
+  markdown.appendText(getDiagnosticSourceLabel());
+  markdown.appendMarkdown("\n\n");
 
   entries.forEach((entry, index) => {
     if (index > 0) {
@@ -527,7 +558,7 @@ export function activate(context: vscode.ExtensionContext): void {
         }
 
         output.clear();
-        output.appendLine("Rust 中文诊断");
+        output.appendLine(getDiagnosticSourceLabel());
         output.appendLine("============");
 
         for (const [index, entry] of entries.entries()) {

@@ -44,7 +44,7 @@ Download or build a release VSIX, then install it from the VS Code command palet
 For a local package:
 
 ```powershell
-code --install-extension .\rust-analyzer-lingo-0.1.3.vsix --force
+code --install-extension .\rust-analyzer-lingo-0.1.4.vsix --force
 ```
 
 ### From source
@@ -56,7 +56,7 @@ Copy-Item proxy\target\release\rust-analyzer-lingo-proxy.exe bin\rust-analyzer-l
 npm run package
 ```
 
-The generated VSIX is named `rust-analyzer-lingo-0.1.3.vsix`.
+The generated VSIX is named `rust-analyzer-lingo-0.1.4.vsix`.
 
 ## Use it
 
@@ -84,7 +84,7 @@ The command palette also provides:
 - **Rust Diagnostics: Enable Native Chinese Hover Translation** - Route the bundled native `rust-analyzer` server through the Windows proxy.
 - **Rust Diagnostics: Restore Native Hover** - Restore the server path and environment settings saved before proxy activation.
 
-The native Hover command updates the selected workspace or global `rust-analyzer` settings and keeps a backup in the extension's global state. It also enables original rustc diagnostic codes so the official client does not replace them with a hard-coded English link label. Restarting the Rust server may be required on older versions of the official `rust-analyzer` extension.
+The native Hover command updates the selected workspace or global `rust-analyzer` settings and keeps a backup in the extension's global state. It also enables original rustc diagnostic codes so the official client does not replace them with a hard-coded English link label. Diagnostic source labels follow the current VS Code UI language, with a language-neutral English fallback. Restarting the Rust server may be required on older versions of the official `rust-analyzer` extension.
 
 ## Architecture
 
@@ -127,8 +127,8 @@ GitHub Actions checks pull requests and pushes to `main` on a Windows x64 runner
 To publish a release, make the tag match the version in `package.json`, then push it:
 
 ```powershell
-git tag v0.1.3
-git push origin v0.1.3
+git tag v0.1.4
+git push origin v0.1.4
 ```
 
 A `v*` tag creates a GitHub Release automatically and attaches the generated VSIX. You can also run the workflow manually from the Actions tab; manual runs build and upload an artifact without creating a release.

@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 const REAL_SERVER_ENV: &str = "RUST_ANALYZER_LINGO_REAL_SERVER";
+const LOCALE_ENV: &str = "RUST_ANALYZER_LINGO_LOCALE";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum RequestKind {
@@ -361,7 +362,7 @@ fn translate_diagnostic(diagnostic: &mut Value, catalog: &HashMap<String, String
         // codeDescription 自动追加的英文“Click for full compiler diagnostic”链接。
         object.insert(
             "source".to_owned(),
-            Value::String("Rust 中文诊断".to_owned()),
+            Value::String(diagnostic_source_label().to_owned()),
         );
         object.remove("codeDescription");
 
@@ -728,6 +729,70 @@ fn contains_chinese(value: &str) -> bool {
         .any(|character| ('\u{4e00}'..='\u{9fff}').contains(&character))
 }
 
+fn diagnostic_source_label() -> &'static str {
+    localized_source_label(&active_locale())
+}
+
+fn active_locale() -> String {
+    if let Ok(locale) = env::var(LOCALE_ENV) {
+        if !locale.trim().is_empty() {
+            return locale;
+        }
+    }
+
+    if let Ok(nls_config) = env::var("VSCODE_NLS_CONFIG") {
+        if let Ok(config) = serde_json::from_str::<Value>(&nls_config) {
+            if let Some(locale) = config
+                .get("locale")
+                .or_else(|| config.get("osLocale"))
+                .and_then(Value::as_str)
+            {
+                return locale.to_owned();
+            }
+        }
+    }
+
+    env::var("LANG").unwrap_or_else(|_| "en".to_owned())
+}
+
+fn localized_source_label(locale: &str) -> &'static str {
+    let locale = locale.trim().to_ascii_lowercase().replace('_', "-");
+
+    if locale.starts_with("zh-tw")
+        || locale.starts_with("zh-hk")
+        || locale.starts_with("zh-mo")
+        || locale.starts_with("zh-hant")
+    {
+        return "Rust 中文診斷";
+    }
+    if locale.starts_with("zh") {
+        return "Rust 中文诊断";
+    }
+    if locale.starts_with("ja") {
+        return "Rust 診断";
+    }
+    if locale.starts_with("ko") {
+        return "Rust 진단";
+    }
+    if locale.starts_with("de") {
+        return "Rust-Diagnose";
+    }
+    if locale.starts_with("fr") {
+        return "Diagnostics Rust";
+    }
+    if locale.starts_with("es") {
+        return "Diagnósticos de Rust";
+    }
+    if locale.starts_with("pt") {
+        return "Diagnósticos do Rust";
+    }
+    if locale.starts_with("ru") {
+        return "Диагностика Rust";
+    }
+
+    "Rust Diagnostics"
+}
+
 fn load_catalog() -> HashMap<String, String> {
     let Some(extension_root) = env::current_exe()
         .ok()
@@ -886,7 +951,7 @@ mod tests {
             diagnostic["message"],
             "整数字面量 `12329` 超出了 `i8` 的取值范围 `-128..=127`；建议改用 `i16`"
         );
-        assert_eq!(diagnostic["source"], "Rust 中文诊断");
+        assert_eq!(diagnostic["source"], diagnostic_source_label());
         assert_eq!(diagnostic["code"], "overflowing_literals");
         assert!(diagnostic.get("codeDescription").is_none());
 
@@ -939,5 +1004,15 @@ mod tests {
             normalize_code(&json!("rustc(E0308)")),
             Some("E0308".to_owned())
         );
+    }
+
+    #[test]
+    fn localizes_diagnostic_source_labels() {
+        assert_eq!(localized_source_label("zh-cn"), "Rust 中文诊断");
+        assert_eq!(localized_source_label("zh-Hant"), "Rust 中文診斷");
+        assert_eq!(localized_source_label("ja"), "Rust 診断");
+        assert_eq!(localized_source_label("de-DE"), "Rust-Diagnose");
+        assert_eq!(localized_source_label("en-US"), "Rust Diagnostics");
+        assert_eq!(localized_source_label("unknown"), "Rust Diagnostics");
     }
 }
