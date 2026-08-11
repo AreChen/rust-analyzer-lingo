@@ -10,6 +10,12 @@ use std::thread;
 
 const REAL_SERVER_ENV: &str = "RUST_ANALYZER_LINGO_REAL_SERVER";
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RequestKind {
+    Diagnostic,
+    Hover,
+}
+
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     let Some(real_server) = find_real_server() else {
@@ -57,10 +63,10 @@ fn run_lsp_proxy(real_server: &Path, args: &[String]) -> io::Result<()> {
         .take()
         .ok_or_else(|| io::Error::new(io::ErrorKind::BrokenPipe, "原始服务器没有 stdout"))?;
 
-    let diagnostic_requests = Arc::new(Mutex::new(HashSet::<String>::new()));
+    let pending_requests = Arc::new(Mutex::new(HashMap::<String, RequestKind>::new()));
     let catalog = Arc::new(load_catalog());
 
-    let requests_to_server = Arc::clone(&diagnostic_requests);
+    let requests_to_server = Arc::clone(&pending_requests);
     let client_to_server = thread::spawn(move || -> io::Result<()> {
         let stdin = io::stdin();
         let mut reader = BufReader::new(stdin.lock());
@@ -68,7 +74,7 @@ fn run_lsp_proxy(real_server: &Path, args: &[String]) -> io::Result<()> {
 
         while let Some(body) = read_lsp_message(&mut reader)? {
             debug_log(&format!("客户端 -> 服务器：{} 字节", body.len()));
-            let body = track_diagnostic_request(body, &requests_to_server);
+            let body = track_request(body, &requests_to_server);
             write_lsp_message(&mut writer, &body)?;
             writer.flush()?;
         }
@@ -76,7 +82,7 @@ fn run_lsp_proxy(real_server: &Path, args: &[String]) -> io::Result<()> {
         Ok(())
     });
 
-    let requests_from_server = Arc::clone(&diagnostic_requests);
+    let requests_from_server = Arc::clone(&pending_requests);
     let catalog_from_server = Arc::clone(&catalog);
     let server_to_client = thread::spawn(move || -> io::Result<()> {
         let mut reader = BufReader::new(server_stdout);
@@ -165,22 +171,24 @@ fn write_lsp_message<W: Write>(writer: &mut W, body: &[u8]) -> io::Result<()> {
     writer.write_all(body)
 }
 
-fn track_diagnostic_request(body: Vec<u8>, requests: &Arc<Mutex<HashSet<String>>>) -> Vec<u8> {
+fn track_request(body: Vec<u8>, requests: &Arc<Mutex<HashMap<String, RequestKind>>>) -> Vec<u8> {
     let Ok(message) = serde_json::from_slice::<Value>(&body) else {
         return body;
     };
 
-    let is_diagnostic_request = message
-        .get("method")
-        .and_then(Value::as_str)
-        .map(|method| method == "textDocument/diagnostic" || method == "workspace/diagnostic")
-        .unwrap_or(false);
+    let request_kind =
+        message
+            .get("method")
+            .and_then(Value::as_str)
+            .and_then(|method| match method {
+                "textDocument/diagnostic" | "workspace/diagnostic" => Some(RequestKind::Diagnostic),
+                "textDocument/hover" => Some(RequestKind::Hover),
+                _ => None,
+            });
 
-    if is_diagnostic_request {
-        if let Some(id) = message.get("id") {
-            if let Ok(mut requests) = requests.lock() {
-                requests.insert(id_key(id));
-            }
+    if let (Some(request_kind), Some(id)) = (request_kind, message.get("id")) {
+        if let Ok(mut requests) = requests.lock() {
+            requests.insert(id_key(id), request_kind);
         }
     }
 
@@ -189,7 +197,7 @@ fn track_diagnostic_request(body: Vec<u8>, requests: &Arc<Mutex<HashSet<String>>
 
 fn translate_server_message(
     message: &mut Value,
-    diagnostic_requests: &Arc<Mutex<HashSet<String>>>,
+    pending_requests: &Arc<Mutex<HashMap<String, RequestKind>>>,
     catalog: &HashMap<String, String>,
 ) {
     if message
@@ -207,26 +215,22 @@ fn translate_server_message(
         }
     }
 
-    let request_id = message.get("id").map(id_key);
-    let is_diagnostic_response = request_id
-        .as_ref()
-        .and_then(|id| {
-            diagnostic_requests
+    let request_kind = if message.get("method").is_none() {
+        message.get("id").map(id_key).and_then(|id| {
+            pending_requests
                 .lock()
                 .ok()
-                .map(|requests| requests.contains(id))
+                .and_then(|mut requests| requests.remove(&id))
         })
-        .unwrap_or(false);
+    } else {
+        None
+    };
 
-    if is_diagnostic_response {
-        if let Some(id) = request_id {
-            if let Ok(mut requests) = diagnostic_requests.lock() {
-                requests.remove(&id);
-            }
-        }
-
-        if let Some(result) = message.get_mut("result") {
-            translate_diagnostic_result(result, catalog);
+    if let Some(result) = message.get_mut("result") {
+        match request_kind {
+            Some(RequestKind::Diagnostic) => translate_diagnostic_result(result, catalog),
+            Some(RequestKind::Hover) => translate_hover_result(result),
+            None => {}
         }
     }
 }
@@ -255,6 +259,38 @@ fn translate_diagnostic_result(result: &mut Value, catalog: &HashMap<String, Str
         }
         _ => {}
     }
+}
+
+fn translate_hover_result(result: &mut Value) {
+    if let Some(contents) = result.get_mut("contents") {
+        translate_hover_contents(contents);
+    }
+}
+
+fn translate_hover_contents(contents: &mut Value) {
+    match contents {
+        Value::String(text) => *text = translate_hover_text(text),
+        Value::Array(items) => {
+            for item in items {
+                translate_hover_contents(item);
+            }
+        }
+        Value::Object(object) => {
+            if let Some(value) = object.get_mut("value") {
+                translate_hover_contents(value);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn translate_hover_text(text: &str) -> String {
+    text.replace("value of literal: ", "字面量的值：")
+        .replace("value of literal:", "字面量的值：")
+        .replace(
+            "invalid literal: MoreThanOneChar",
+            "无效的字符字面量：包含多个字符",
+        )
 }
 
 fn translate_diagnostics(diagnostics: &mut Vec<Value>, catalog: &HashMap<String, String>) {
@@ -294,6 +330,10 @@ fn translate_diagnostic(diagnostic: &mut Value, catalog: &HashMap<String, String
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_string();
+    let rendered = diagnostic
+        .pointer("/data/rendered")
+        .and_then(Value::as_str)
+        .map(str::to_owned);
     let code = diagnostic.get("code").and_then(normalize_code);
 
     let chinese = code
@@ -301,11 +341,11 @@ fn translate_diagnostic(diagnostic: &mut Value, catalog: &HashMap<String, String
         .and_then(common_title)
         .map(str::to_owned)
         .or_else(|| code.as_deref().and_then(|code| catalog.get(code).cloned()))
+        .or_else(|| translate_message_with_context(&original_message, rendered.as_deref()))
         .or_else(|| {
             code.as_deref()
-                .map(|code| format!("Rust 编译错误 {}", code))
+                .map(|code| format!("Rust 编译诊断 `{}`", code))
         })
-        .or_else(|| translate_message(&original_message))
         .unwrap_or_else(|| "Rust 诊断提示".to_owned());
 
     let translated_message = if let Some(explanation) = code.as_deref().and_then(common_explanation)
@@ -324,6 +364,15 @@ fn translate_diagnostic(diagnostic: &mut Value, catalog: &HashMap<String, String
             Value::String("Rust 中文诊断".to_owned()),
         );
         object.remove("codeDescription");
+
+        if let Some(translated_rendered) = rendered
+            .as_deref()
+            .and_then(|rendered| translate_rendered_diagnostic(&original_message, rendered))
+        {
+            if let Some(data) = object.get_mut("data").and_then(Value::as_object_mut) {
+                data.insert("rendered".to_owned(), Value::String(translated_rendered));
+            }
+        }
 
         if let Some(related_information) = object
             .get_mut("relatedInformation")
@@ -391,6 +440,16 @@ fn normalize_code(value: &Value) -> Option<String> {
             return Some(upper[index..index + 5].to_owned());
         }
     }
+
+    let raw = raw.trim();
+    if !raw.is_empty()
+        && raw
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '_' | '-'))
+    {
+        return Some(raw.to_ascii_lowercase());
+    }
+
     None
 }
 
@@ -414,6 +473,146 @@ fn common_explanation(code: &str) -> Option<&'static str> {
         "E0596" => Some("如果需要通过借用修改值，请先使用 let mut 声明变量"),
         _ => None,
     }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+struct LiteralOverflowDetails {
+    target_type: String,
+    literal: Option<String>,
+    range: Option<String>,
+    suggested_type: Option<String>,
+}
+
+fn translate_message_with_context(message: &str, rendered: Option<&str>) -> Option<String> {
+    if let Some(details) = parse_literal_overflow(message, rendered) {
+        return Some(literal_overflow_summary(&details));
+    }
+
+    translate_message(message)
+}
+
+fn parse_literal_overflow(message: &str, rendered: Option<&str>) -> Option<LiteralOverflowDetails> {
+    if !message
+        .to_ascii_lowercase()
+        .contains("literal out of range for")
+    {
+        return None;
+    }
+
+    let target_type = backticked_value_after(message, "literal out of range for")?;
+    let rendered = rendered.map(strip_ansi_sequences).unwrap_or_default();
+
+    Some(LiteralOverflowDetails {
+        target_type,
+        literal: backticked_value_after(&rendered, "the literal"),
+        range: backticked_value_after(&rendered, "whose range is"),
+        suggested_type: backticked_value_after(&rendered, "consider using the type"),
+    })
+}
+
+fn literal_overflow_summary(details: &LiteralOverflowDetails) -> String {
+    let subject = details
+        .literal
+        .as_deref()
+        .map(|literal| format!("整数字面量 `{}`", literal))
+        .unwrap_or_else(|| "整数字面量".to_owned());
+    let mut summary = format!("{} 超出了 `{}` 的取值范围", subject, details.target_type);
+
+    if let Some(range) = details.range.as_deref() {
+        summary.push_str(&format!(" `{}`", range));
+    }
+    if let Some(suggested_type) = details.suggested_type.as_deref() {
+        summary.push_str(&format!("；建议改用 `{}`", suggested_type));
+    }
+
+    summary
+}
+
+fn translate_rendered_diagnostic(message: &str, rendered: &str) -> Option<String> {
+    let details = parse_literal_overflow(message, Some(rendered))?;
+    let rendered = strip_ansi_sequences(rendered);
+    let title = format!("整数字面量超出了 `{}` 的取值范围", details.target_type);
+    let note = match (details.literal.as_deref(), details.range.as_deref()) {
+        (Some(literal), Some(range)) => format!(
+            "字面量 `{}` 无法存入类型 `{}`，该类型的范围是 `{}`",
+            literal, details.target_type, range
+        ),
+        (Some(literal), None) => format!(
+            "字面量 `{}` 无法存入类型 `{}`",
+            literal, details.target_type
+        ),
+        _ => title.clone(),
+    };
+
+    let mut translated_lines = Vec::new();
+    for line in rendered.lines() {
+        let trimmed = line.trim_start();
+        let indent = &line[..line.len() - trimmed.len()];
+        let lower = trimmed.to_ascii_lowercase();
+
+        let translated = if lower.contains("error: literal out of range for") {
+            format!("{}错误：{}", indent, title)
+        } else if lower.contains("= note: the literal") && lower.contains("does not fit") {
+            format!("{}= 说明：{}", indent, note)
+        } else if lower.contains("= help: consider using the type") {
+            let suggestion = details
+                .suggested_type
+                .as_deref()
+                .map(|value| format!("改用类型 `{}`", value))
+                .unwrap_or_else(|| "改用范围更大的整数类型".to_owned());
+            format!("{}= 建议：{}", indent, suggestion)
+        } else if lower.contains("= note: `#[deny(overflowing_literals)]` on by default") {
+            format!(
+                "{}= 说明：默认启用了 `#[deny(overflowing_literals)]`",
+                indent
+            )
+        } else {
+            line.to_owned()
+        };
+
+        translated_lines.push(translated);
+    }
+
+    let mut translated = translated_lines.join("\n");
+    if rendered.ends_with('\n') {
+        translated.push('\n');
+    }
+    Some(translated)
+}
+
+fn backticked_value_after(text: &str, marker: &str) -> Option<String> {
+    let lower = text.to_ascii_lowercase();
+    let marker = marker.to_ascii_lowercase();
+    let marker_end = lower.find(&marker)? + marker.len();
+    let remainder = &text[marker_end..];
+    let value_start = remainder.find('`')? + 1;
+    let value = &remainder[value_start..];
+    let value_end = value.find('`')?;
+    Some(value[..value_end].to_owned())
+}
+
+fn strip_ansi_sequences(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let mut stripped = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+
+    while index < bytes.len() {
+        if bytes[index] == 0x1b && bytes.get(index + 1) == Some(&b'[') {
+            index += 2;
+            while index < bytes.len() {
+                let byte = bytes[index];
+                index += 1;
+                if (0x40..=0x7e).contains(&byte) {
+                    break;
+                }
+            }
+        } else {
+            stripped.push(bytes[index]);
+            index += 1;
+        }
+    }
+
+    String::from_utf8_lossy(&stripped).into_owned()
 }
 
 fn translate_message(message: &str) -> Option<String> {
@@ -499,7 +698,7 @@ fn translate_related_message(message: &str) -> String {
     {
         return "字符字面量只能包含一个字符".to_owned();
     }
-    if let Some(translated) = translate_message(trimmed) {
+    if let Some(translated) = translate_message_with_context(trimmed, None) {
         return translated;
     }
 
@@ -646,5 +845,99 @@ fn id_key(value: &Value) -> String {
 fn debug_log(message: &str) {
     if env::var_os("RUST_ANALYZER_LINGO_DEBUG").is_some() {
         eprintln!("rust-analyzer-lingo: {}", message);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn translates_overflowing_literal_with_rendered_context() {
+        let mut diagnostic = json!({
+            "range": {
+                "start": { "line": 61, "character": 46 },
+                "end": { "line": 61, "character": 51 }
+            },
+            "severity": 1,
+            "code": "overflowing_literals",
+            "codeDescription": { "href": "https://example.invalid" },
+            "source": "rustc",
+            "message": "literal out of range for `i8`",
+            "data": {
+                "rendered": concat!(
+                    "\u{1b}[1merror\u{1b}[0m: literal out of range for `i8`\n",
+                    "  --> src\\main.rs:62:47\n",
+                    "   |\n",
+                    "62 |     let value: i8 = 12329;\n",
+                    "   |                     ^^^^^\n",
+                    "   |\n",
+                    "   = note: the literal `12329` does not fit into the type `i8` whose range is `-128..=127`\n",
+                    "   = help: consider using the type `i16` instead\n",
+                    "   = note: `#[deny(overflowing_literals)]` on by default\n"
+                )
+            }
+        });
+
+        translate_diagnostic(&mut diagnostic, &HashMap::new());
+
+        assert_eq!(
+            diagnostic["message"],
+            "整数字面量 `12329` 超出了 `i8` 的取值范围 `-128..=127`；建议改用 `i16`"
+        );
+        assert_eq!(diagnostic["source"], "Rust 中文诊断");
+        assert_eq!(diagnostic["code"], "overflowing_literals");
+        assert!(diagnostic.get("codeDescription").is_none());
+
+        let rendered = diagnostic["data"]["rendered"].as_str().unwrap();
+        assert!(rendered.contains("错误：整数字面量超出了 `i8` 的取值范围"));
+        assert!(rendered.contains("说明：字面量 `12329` 无法存入类型 `i8`"));
+        assert!(rendered.contains("建议：改用类型 `i16`"));
+        assert!(!rendered.contains("literal out of range"));
+        assert!(!rendered.contains('\u{1b}'));
+    }
+
+    #[test]
+    fn tracks_and_translates_literal_hover_responses() {
+        let requests = Arc::new(Mutex::new(HashMap::new()));
+        let request = serde_json::to_vec(&json!({
+            "jsonrpc": "2.0",
+            "id": 7,
+            "method": "textDocument/hover",
+            "params": {}
+        }))
+        .unwrap();
+        track_request(request, &requests);
+
+        let mut response = json!({
+            "jsonrpc": "2.0",
+            "id": 7,
+            "result": {
+                "contents": {
+                    "kind": "markdown",
+                    "value": "```rust\ni8\n```\n\nvalue of literal: 12329 (0x3029|0b11000000101001)"
+                }
+            }
+        });
+        translate_server_message(&mut response, &requests, &HashMap::new());
+
+        assert_eq!(
+            response["result"]["contents"]["value"],
+            "```rust\ni8\n```\n\n字面量的值：12329 (0x3029|0b11000000101001)"
+        );
+        assert!(requests.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn preserves_named_rustc_lint_codes() {
+        assert_eq!(
+            normalize_code(&json!("overflowing_literals")),
+            Some("overflowing_literals".to_owned())
+        );
+        assert_eq!(
+            normalize_code(&json!("rustc(E0308)")),
+            Some("E0308".to_owned())
+        );
     }
 }

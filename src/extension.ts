@@ -32,6 +32,7 @@ interface TranslatedDiagnostic {
 interface PreviousNativeSettings {
   serverPath: string | null;
   extraEnv: Record<string, string> | null;
+  useRustcErrorCode?: boolean;
 }
 
 function getWorkspaceConfigurationTarget(): vscode.ConfigurationTarget {
@@ -96,7 +97,19 @@ async function enableNativeChineseHover(
   if (!previous) {
     await context.globalState.update(PREVIOUS_NATIVE_SETTINGS_KEY, {
       serverPath: rustAnalyzer.get<string | null>("server.path", null),
-      extraEnv: rustAnalyzer.get<Record<string, string> | null>("server.extraEnv", null)
+      extraEnv: rustAnalyzer.get<Record<string, string> | null>("server.extraEnv", null),
+      useRustcErrorCode: rustAnalyzer.get<boolean>(
+        "diagnostics.useRustcErrorCode",
+        false
+      )
+    } satisfies PreviousNativeSettings);
+  } else if (previous.useRustcErrorCode === undefined) {
+    await context.globalState.update(PREVIOUS_NATIVE_SETTINGS_KEY, {
+      ...previous,
+      useRustcErrorCode: rustAnalyzer.get<boolean>(
+        "diagnostics.useRustcErrorCode",
+        false
+      )
     } satisfies PreviousNativeSettings);
   }
 
@@ -112,6 +125,9 @@ async function enableNativeChineseHover(
 
   await rustAnalyzer.update("server.extraEnv", extraEnv, target);
   await rustAnalyzer.update("server.path", proxyPath, target);
+  // rust-analyzer 默认会把诊断代码替换成硬编码的英文链接文本。
+  // 使用原始 rustc 代码后，Hover 会显示 E0308、overflowing_literals 等稳定标识。
+  await rustAnalyzer.update("diagnostics.useRustcErrorCode", true, target);
   await restartRustAnalyzer();
 
   void vscode.window.showInformationMessage(
@@ -134,6 +150,13 @@ async function disableNativeChineseHover(
   const target = getWorkspaceConfigurationTarget();
   await rustAnalyzer.update("server.path", previous.serverPath, target);
   await rustAnalyzer.update("server.extraEnv", previous.extraEnv, target);
+  if (previous.useRustcErrorCode !== undefined) {
+    await rustAnalyzer.update(
+      "diagnostics.useRustcErrorCode",
+      previous.useRustcErrorCode,
+      target
+    );
+  }
   await context.globalState.update(PREVIOUS_NATIVE_SETTINGS_KEY, undefined);
   await restartRustAnalyzer();
 

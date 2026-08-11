@@ -35,7 +35,7 @@
 也可以在终端执行：
 
 ```powershell
-code --install-extension .\rust-analyzer-lingo-0.1.2.vsix --force
+code --install-extension .\rust-analyzer-lingo-0.1.3.vsix --force
 ```
 
 ### 从源码构建
@@ -47,7 +47,7 @@ Copy-Item proxy\target\release\rust-analyzer-lingo-proxy.exe bin\rust-analyzer-l
 npm run package
 ```
 
-生成的文件名为 `rust-analyzer-lingo-0.1.2.vsix`。
+生成的文件名为 `rust-analyzer-lingo-0.1.3.vsix`。
 
 ## 基本使用
 
@@ -85,7 +85,7 @@ npm run package
 - **Rust 中文诊断：启用原生 Hover 中文替换**：让内置 Windows x64 代理接管 `rust-analyzer` 的服务器路径。
 - **Rust 中文诊断：恢复原生 Hover**：恢复启用代理前保存的服务器路径和环境变量。
 
-启用原生 Hover 时，扩展会修改当前工作区或全局的 `rust-analyzer` 设置，并在扩展状态中保存原配置。旧版 `rust-analyzer` 可能需要手动执行 **Rust Analyzer: Restart Server**。
+启用原生 Hover 时，扩展会修改当前工作区或全局的 `rust-analyzer` 设置，并在扩展状态中保存原配置。它还会启用原始 rustc 诊断代码，避免官方客户端把代码替换成硬编码的英文链接文字。旧版 `rust-analyzer` 可能需要手动执行 **Rust Analyzer: Restart Server**。
 
 ## 错误代码词典
 
@@ -95,7 +95,7 @@ npm run package
 
 ## 工作原理
 
-扩展层读取 VS Code 已经收到的 Rust 诊断，按照错误代码和常见英文消息匹配中文内容，然后把结果放到行内提示、Hover 或 Problems 面板中。原生 Hover 模式下，Windows x64 Rust 代理使用标准 LSP 转发所有无关消息，只翻译诊断消息，并通过 `RUST_ANALYZER_LINGO_REAL_SERVER` 找到真正的 `rust-analyzer` 可执行文件。
+扩展层读取 VS Code 已经收到的 Rust 诊断，按照错误代码和常见英文消息匹配中文内容，然后把结果放到行内提示、Hover 或 Problems 面板中。原生 Hover 模式下，Windows x64 Rust 代理使用标准 LSP 转发无关消息，翻译诊断及已支持的 Hover 元数据，并通过 `RUST_ANALYZER_LINGO_REAL_SERVER` 找到真正的 `rust-analyzer` 可执行文件。
 
 ## 开发
 
@@ -123,11 +123,11 @@ npm run package
 需要正式发版时，让 Git 标签版本与 `package.json` 中的版本一致，然后推送标签：
 
 ```powershell
-git tag v0.1.2
-git push origin v0.1.2
+git tag v0.1.3
+git push origin v0.1.3
 ```
 
-推送 `v*` 标签后，工作流会自动创建 GitHub Release，并把生成的 `rust-analyzer-lingo-0.1.2.vsix` 附加到 Release。也可以在 Actions 页面手动运行工作流；手动运行只构建 Artifact，不会创建 Release。
+推送 `v*` 标签后，工作流会自动创建 GitHub Release，并把生成的 `rust-analyzer-lingo-0.1.3.vsix` 附加到 Release。也可以在 Actions 页面手动运行工作流；手动运行只构建 Artifact，不会创建 Release。
 
 ## 后续计划
 

@@ -336,17 +336,27 @@ export function getDiagnosticCode(diagnostic: vscode.Diagnostic): string | undef
   const rawCode = diagnostic.code;
 
   if (typeof rawCode === "string" || typeof rawCode === "number") {
-    return String(rawCode).toUpperCase();
+    return normalizeDiagnosticCode(rawCode);
   }
 
   if (rawCode && typeof rawCode === "object" && "value" in rawCode) {
     const value = rawCode.value;
     if (typeof value === "string" || typeof value === "number") {
-      return String(value).toUpperCase();
+      return normalizeDiagnosticCode(value);
     }
   }
 
   return undefined;
+}
+
+function normalizeDiagnosticCode(value: string | number): string | undefined {
+  const raw = String(value).trim();
+  if (!raw || /click for full compiler diagnostics?/i.test(raw)) {
+    return undefined;
+  }
+
+  const errorCode = raw.match(/E\d{4}/i)?.[0];
+  return errorCode ? errorCode.toUpperCase() : raw;
 }
 
 export function translateDiagnostic(diagnostic: vscode.Diagnostic): DiagnosticTranslation {
@@ -369,6 +379,23 @@ export function translateDiagnostic(diagnostic: vscode.Diagnostic): DiagnosticTr
   }
 
   const message = diagnostic.message.replace(/\r?\n/g, " ").trim();
+  if (/[\u3400-\u9fff]/u.test(message)) {
+    return {
+      chinese: message,
+      matchedBy: "message"
+    };
+  }
+
+  const overflow = message.match(/literal out of range for\s+[`']([^`']+)[`']/i);
+  if (overflow) {
+    const targetType = overflow[1];
+    return {
+      chinese: `整数字面量超出了 ${targetType} 的取值范围`,
+      explanation: `当前数值无法存入 ${targetType}；请减小数值，或改用范围更大的整数类型。`,
+      matchedBy: "message"
+    };
+  }
+
   const phrase = MESSAGE_TRANSLATIONS.find((item) => item.pattern.test(message));
 
   if (phrase) {
