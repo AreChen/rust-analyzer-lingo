@@ -35,7 +35,7 @@
 也可以在终端执行：
 
 ```powershell
-code --install-extension .\rust-analyzer-lingo-0.1.1.vsix --force
+code --install-extension .\rust-analyzer-lingo-0.1.2.vsix --force
 ```
 
 ### 从源码构建
@@ -47,7 +47,7 @@ Copy-Item proxy\target\release\rust-analyzer-lingo-proxy.exe bin\rust-analyzer-l
 npm run package
 ```
 
-生成的文件名为 `rust-analyzer-lingo-0.1.1.vsix`。
+生成的文件名为 `rust-analyzer-lingo-0.1.2.vsix`。
 
 ## 基本使用
 
@@ -123,11 +123,11 @@ npm run package
 需要正式发版时，让 Git 标签版本与 `package.json` 中的版本一致，然后推送标签：
 
 ```powershell
-git tag v0.1.1
-git push origin v0.1.1
+git tag v0.1.2
+git push origin v0.1.2
 ```
 
-推送 `v*` 标签后，工作流会自动创建 GitHub Release，并把生成的 `rust-analyzer-lingo-0.1.1.vsix` 附加到 Release。也可以在 Actions 页面手动运行工作流；手动运行只构建 Artifact，不会创建 Release。
+推送 `v*` 标签后，工作流会自动创建 GitHub Release，并把生成的 `rust-analyzer-lingo-0.1.2.vsix` 附加到 Release。也可以在 Actions 页面手动运行工作流；手动运行只构建 Artifact，不会创建 Release。
 
 ## 后续计划
 

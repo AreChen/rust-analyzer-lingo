@@ -96,14 +96,13 @@ fn run_lsp_proxy(real_server: &Path, args: &[String]) -> io::Result<()> {
                 }
             };
 
-            translate_server_message(
-                &mut message,
-                &requests_from_server,
-                &catalog_from_server,
-            );
+            translate_server_message(&mut message, &requests_from_server, &catalog_from_server);
 
             let translated = serde_json::to_vec(&message).map_err(|error| {
-                io::Error::new(io::ErrorKind::InvalidData, format!("序列化 LSP 消息失败：{}", error))
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("序列化 LSP 消息失败：{}", error),
+                )
             })?;
             write_lsp_message(&mut writer, &translated)?;
             writer.flush()?;
@@ -145,7 +144,10 @@ fn read_lsp_message<R: BufRead>(reader: &mut R) -> io::Result<Option<Vec<u8>>> {
         if let Some((name, value)) = trimmed.split_once(':') {
             if name.eq_ignore_ascii_case("content-length") {
                 content_length = Some(value.trim().parse::<usize>().map_err(|error| {
-                    io::Error::new(io::ErrorKind::InvalidData, format!("无效的 Content-Length：{}", error))
+                    io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("无效的 Content-Length：{}", error),
+                    )
                 })?);
             }
         }
@@ -163,10 +165,7 @@ fn write_lsp_message<W: Write>(writer: &mut W, body: &[u8]) -> io::Result<()> {
     writer.write_all(body)
 }
 
-fn track_diagnostic_request(
-    body: Vec<u8>,
-    requests: &Arc<Mutex<HashSet<String>>>,
-) -> Vec<u8> {
+fn track_diagnostic_request(body: Vec<u8>, requests: &Arc<Mutex<HashSet<String>>>) -> Vec<u8> {
     let Ok(message) = serde_json::from_slice::<Value>(&body) else {
         return body;
     };
@@ -174,9 +173,7 @@ fn track_diagnostic_request(
     let is_diagnostic_request = message
         .get("method")
         .and_then(Value::as_str)
-        .map(|method| {
-            method == "textDocument/diagnostic" || method == "workspace/diagnostic"
-        })
+        .map(|method| method == "textDocument/diagnostic" || method == "workspace/diagnostic")
         .unwrap_or(false);
 
     if is_diagnostic_request {
@@ -213,7 +210,12 @@ fn translate_server_message(
     let request_id = message.get("id").map(id_key);
     let is_diagnostic_response = request_id
         .as_ref()
-        .and_then(|id| diagnostic_requests.lock().ok().map(|requests| requests.contains(id)))
+        .and_then(|id| {
+            diagnostic_requests
+                .lock()
+                .ok()
+                .map(|requests| requests.contains(id))
+        })
         .unwrap_or(false);
 
     if is_diagnostic_response {
@@ -299,7 +301,10 @@ fn translate_diagnostic(diagnostic: &mut Value, catalog: &HashMap<String, String
         .and_then(common_title)
         .map(str::to_owned)
         .or_else(|| code.as_deref().and_then(|code| catalog.get(code).cloned()))
-        .or_else(|| code.as_deref().map(|code| format!("Rust 编译错误 {}", code)))
+        .or_else(|| {
+            code.as_deref()
+                .map(|code| format!("Rust 编译错误 {}", code))
+        })
         .or_else(|| translate_message(&original_message))
         .unwrap_or_else(|| "Rust 诊断提示".to_owned());
 
@@ -324,17 +329,47 @@ fn translate_diagnostic(diagnostic: &mut Value, catalog: &HashMap<String, String
             .get_mut("relatedInformation")
             .and_then(Value::as_array_mut)
         {
-            for related in related_information {
-                let translated = related
+            related_information.retain_mut(|related| {
+                let Some(related_object) = related.as_object_mut() else {
+                    return false;
+                };
+
+                // VS Code renders relatedInformation as additional lines in the
+                // native diagnostic hover. Remove metadata that merely repeats
+                // the primary diagnostic, but keep actionable compiler notes.
+                related_object.remove("codeDescription");
+
+                let Some(related_message) = related_object
                     .get("message")
                     .and_then(Value::as_str)
-                    .map(translate_related_message);
-                if let Some(translated) = translated {
-                    related["message"] = Value::String(translated);
+                    .map(str::to_owned)
+                else {
+                    return false;
+                };
+
+                if is_redundant_related_message(&related_message, &original_message) {
+                    return false;
                 }
-            }
+
+                related_object.insert(
+                    "message".to_owned(),
+                    Value::String(translate_related_message(&related_message)),
+                );
+                true
+            });
         }
     }
+}
+
+fn is_redundant_related_message(message: &str, original_message: &str) -> bool {
+    let trimmed = message.trim();
+    let lower = trimmed.to_ascii_lowercase();
+
+    trimmed.is_empty()
+        || trimmed == original_message.trim()
+        || lower == "original diagnostic"
+        || lower.contains("click for full compiler diagnostic")
+        || translate_related_message(trimmed) == "Rust 相关诊断提示"
 }
 
 fn normalize_code(value: &Value) -> Option<String> {
@@ -489,7 +524,9 @@ fn translate_expected_found(message: &str) -> String {
 }
 
 fn contains_chinese(value: &str) -> bool {
-    value.chars().any(|character| ('\u{4e00}'..='\u{9fff}').contains(&character))
+    value
+        .chars()
+        .any(|character| ('\u{4e00}'..='\u{9fff}').contains(&character))
 }
 
 fn load_catalog() -> HashMap<String, String> {
@@ -509,9 +546,12 @@ fn load_catalog() -> HashMap<String, String> {
     let mut catalog = HashMap::new();
     for line in source.lines() {
         let line = line.trim();
-        if !line.starts_with('E') || !line.as_bytes().get(1..5).is_some_and(|digits| {
-            digits.iter().all(u8::is_ascii_digit)
-        }) {
+        if !line.starts_with('E')
+            || !line
+                .as_bytes()
+                .get(1..5)
+                .is_some_and(|digits| digits.iter().all(u8::is_ascii_digit))
+        {
             continue;
         }
 
