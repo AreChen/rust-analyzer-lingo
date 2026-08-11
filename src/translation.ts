@@ -320,6 +320,11 @@ const MESSAGE_TRANSLATIONS: ReadonlyArray<{
     pattern: /expected (?:semicolon|';')/i,
     chinese: "这里需要一个分号",
     explanation: "Rust 语句通常需要使用分号结束。"
+  },
+  {
+    pattern: /invalid literal:\s*morethanonechar|character literal may only contain one codepoint/i,
+    chinese: "字符字面量只能包含一个字符",
+    explanation: "Rust 的 char 字面量只能表示一个 Unicode 字符；如果要表示多个字符，请使用字符串字面量，例如 \"a2\"。"
   }
 ];
 

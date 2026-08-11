@@ -21,7 +21,7 @@ Run these from the repository root:
 - Build the Windows proxy: `cargo build --release --manifest-path proxy/Cargo.toml`
 - Copy the release proxy before packaging: `Copy-Item proxy/target/release/rust-analyzer-lingo-proxy.exe bin/rust-analyzer-lingo-proxy.exe -Force`
 - Package the VSIX: `npm run package`
-- Publish a release: push a tag matching the package version, for example `git tag v0.1.0` followed by `git push origin v0.1.0`
+- Publish a release: push a tag matching the package version, for example `git tag v0.1.1` followed by `git push origin v0.1.1`
 
 `npm run package` compiles TypeScript and invokes `vsce package`. In the maintained development environment, external commands are prefixed with `rtk` according to the global agent instructions.
 

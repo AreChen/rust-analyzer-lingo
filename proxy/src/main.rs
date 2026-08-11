@@ -206,9 +206,7 @@ fn translate_server_message(
             .and_then(|params| params.get_mut("diagnostics"))
             .and_then(Value::as_array_mut)
         {
-            for diagnostic in diagnostics {
-                translate_diagnostic(diagnostic, catalog);
-            }
+            translate_diagnostics(diagnostics, catalog);
         }
     }
 
@@ -235,16 +233,14 @@ fn translate_diagnostic_result(result: &mut Value, catalog: &HashMap<String, Str
     match result {
         Value::Object(object) => {
             if let Some(items) = object.get_mut("items").and_then(Value::as_array_mut) {
-                for item in items {
-                    if is_diagnostic(item) {
-                        translate_diagnostic(item, catalog);
-                    } else {
-                        translate_diagnostic_result(item, catalog);
-                    }
-                }
+                translate_diagnostics(items, catalog);
             }
 
-            for value in object.values_mut() {
+            for (key, value) in object.iter_mut() {
+                if key == "items" {
+                    continue;
+                }
+
                 if value.get("range").is_some() && value.get("message").is_some() {
                     translate_diagnostic(value, catalog);
                 } else if value.is_object() {
@@ -253,12 +249,37 @@ fn translate_diagnostic_result(result: &mut Value, catalog: &HashMap<String, Str
             }
         }
         Value::Array(values) => {
-            for value in values {
-                translate_diagnostic_result(value, catalog);
-            }
+            translate_diagnostics(values, catalog);
         }
         _ => {}
     }
+}
+
+fn translate_diagnostics(diagnostics: &mut Vec<Value>, catalog: &HashMap<String, String>) {
+    let mut seen = HashSet::new();
+
+    diagnostics.retain_mut(|diagnostic| {
+        if is_diagnostic(diagnostic) {
+            translate_diagnostic(diagnostic, catalog);
+            return diagnostic_key(diagnostic)
+                .map(|key| seen.insert(key))
+                .unwrap_or(true);
+        }
+
+        translate_diagnostic_result(diagnostic, catalog);
+        true
+    });
+}
+
+fn diagnostic_key(diagnostic: &Value) -> Option<String> {
+    let object = diagnostic.as_object()?;
+    serde_json::to_string(&(
+        object.get("range")?,
+        object.get("message")?,
+        object.get("code"),
+        object.get("severity"),
+    ))
+    .ok()
 }
 
 fn is_diagnostic(value: &Value) -> bool {
@@ -388,6 +409,14 @@ fn translate_message(message: &str) -> Option<String> {
     if lower.contains("expected") && lower.contains("found") {
         return Some(translate_expected_found(trimmed));
     }
+    if lower.contains("morethanonechar")
+        || lower.contains("character literal may only contain one codepoint")
+    {
+        return Some(
+            "字符字面量只能包含一个字符；如果要表示多个字符，请使用字符串字面量，例如 \"a2\""
+                .to_owned(),
+        );
+    }
     if lower.contains("unused variable") {
         return Some("变量已声明但没有使用".to_owned());
     }
@@ -429,6 +458,11 @@ fn translate_related_message(message: &str) -> String {
     }
     if lower.contains("expected") && lower.contains("found") {
         return translate_expected_found(trimmed);
+    }
+    if lower.contains("morethanonechar")
+        || lower.contains("character literal may only contain one codepoint")
+    {
+        return "字符字面量只能包含一个字符".to_owned();
     }
     if let Some(translated) = translate_message(trimmed) {
         return translated;
