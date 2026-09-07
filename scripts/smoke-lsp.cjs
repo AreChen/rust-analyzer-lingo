@@ -21,8 +21,18 @@ async function smoke(server,proxy){
  child.on('error',e=>fatal=e);
  const send=m=>{const b=Buffer.from(JSON.stringify(m));child.stdin.write('Content-Length: '+b.length+'\r\n\r\n');child.stdin.write(b);};
  child.stdout.on('data',chunk=>{buffer=Buffer.concat([buffer,chunk]);for(;;){let p=buffer.indexOf('\r\n\r\n');if(p<0)return;let n=Number(buffer.subarray(0,p).toString().match(/Content-Length: (\d+)/i)?.[1]);if(buffer.length<p+4+n)return;let m=JSON.parse(buffer.subarray(p+4,p+4+n));buffer=buffer.subarray(p+4+n);if(m.method&&m.id!==undefined){send({jsonrpc:'2.0',id:m.id,result:m.method==='workspace/configuration'?m.params.items.map(()=>null):null});}else if(m.id!==undefined){pending.get(m.id)?.(m);pending.delete(m.id);}else notifications.push(m);}});
- const request=(method,params)=>new Promise((resolve,reject)=>{const n=++id;const timer=setTimeout(()=>{pending.delete(n);reject(new Error('Timeout '+method+' '+stderr.slice(-1500)));},45000);pending.set(n,m=>{clearTimeout(timer);m.error?reject(new Error(JSON.stringify(m.error))):resolve(m.result);});send({jsonrpc:'2.0',id:n,method,params});});
+ const requestOnce=(method,params)=>new Promise((resolve,reject)=>{const n=++id;const timer=setTimeout(()=>{pending.delete(n);reject(new Error('Timeout '+method+' '+stderr.slice(-1500)));},45000);pending.set(n,m=>{clearTimeout(timer);m.error?reject(Object.assign(new Error(JSON.stringify(m.error)),{rpcError:m.error})):resolve(m.result);});send({jsonrpc:'2.0',id:n,method,params});});
  const delay=ms=>new Promise(r=>setTimeout(r,ms));
+ // rust-analyzer may cancel reads while indexing and explicitly ask the client to retry.
+ const request=async(method,params)=>{
+  for(let attempt=0;;attempt++) {
+   try { return await requestOnce(method,params); }
+   catch(error) {
+    if(attempt>=20 || error.rpcError?.code!==-32802 || error.rpcError?.data?.retriggerRequest!==true)throw error;
+    await delay(150);
+   }
+  }
+ };
  try{
  const init=await request('initialize',{processId:process.pid,rootUri:pathToFileURL(root).href,workspaceFolders:[{uri:pathToFileURL(root).href,name:'fixture'}],capabilities:{textDocument:{publishDiagnostics:{relatedInformation:true,codeDescriptionSupport:true,dataSupport:true},hover:{contentFormat:['markdown']},codeAction:{dataSupport:true,codeActionLiteralSupport:{codeActionKind:{valueSet:['quickfix']}}}}},initializationOptions:{cargo:{allTargets:false},checkOnSave:true,procMacro:{enable:false}}});
  send({jsonrpc:'2.0',method:'initialized',params:{}});send({jsonrpc:'2.0',method:'textDocument/didOpen',params:{textDocument:{uri,languageId:'rust',version:1,text:source}}});
