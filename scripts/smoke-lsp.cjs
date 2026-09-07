@@ -1,6 +1,12 @@
 // Real-server compatibility smoke test. Usage: node scripts/smoke-lsp.cjs SERVER [PROXY]
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
-const {pathToFileURL}=require('node:url');const {spawn}=require('node:child_process');const assert=require('node:assert/strict');
+const {pathToFileURL,fileURLToPath}=require('node:url');const {spawn}=require('node:child_process');const assert=require('node:assert/strict');
+function sameFileUri(a,b) {
+ try {
+  const canonical=uri=>{const file=fs.realpathSync.native(fileURLToPath(uri));return process.platform==='win32'?file.toLowerCase():file;};
+  return canonical(a)===canonical(b);
+ } catch { return a===b; }
+}
 async function smoke(server,proxy){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'lingo-lsp-'));
  fs.mkdirSync(path.join(root,'src'));
@@ -21,7 +27,7 @@ async function smoke(server,proxy){
  const init=await request('initialize',{processId:process.pid,rootUri:pathToFileURL(root).href,workspaceFolders:[{uri:pathToFileURL(root).href,name:'fixture'}],capabilities:{textDocument:{publishDiagnostics:{relatedInformation:true,codeDescriptionSupport:true,dataSupport:true},hover:{contentFormat:['markdown']},codeAction:{dataSupport:true,codeActionLiteralSupport:{codeActionKind:{valueSet:['quickfix']}}}}},initializationOptions:{cargo:{allTargets:false},checkOnSave:true,procMacro:{enable:false}}});
  send({jsonrpc:'2.0',method:'initialized',params:{}});send({jsonrpc:'2.0',method:'textDocument/didOpen',params:{textDocument:{uri,languageId:'rust',version:1,text:source}}});
  let diagnostics=[];
- for(let n=0;n<200;n++){if(fatal)throw fatal;diagnostics=notifications.filter(m=>m.method==='textDocument/publishDiagnostics'&&m.params.uri.toLowerCase()===uri.toLowerCase()).flatMap(m=>m.params.diagnostics);if(diagnostics.some(d=>String(d.code)==='E0308'))break;await delay(150);}
+ for(let n=0;n<200;n++){if(fatal)throw fatal;diagnostics=notifications.filter(m=>m.method==='textDocument/publishDiagnostics'&&sameFileUri(m.params.uri,uri)).flatMap(m=>m.params.diagnostics);if(diagnostics.some(d=>String(d.code)==='E0308'))break;await delay(150);}
  const mismatch=diagnostics.find(d=>String(d.code)==='E0308');assert.ok(mismatch,'expected real E0308 '+stderr.slice(-1500)+' notifications='+JSON.stringify(notifications.map(m=>({method:m.method,params:m.params}))).slice(-7000));assert.match(mismatch.message,/u32/);assert.match(mismatch.message,/str/);if(proxy)assert.match(mismatch.message,/中文：/);
  const hover=await request('textDocument/hover',{textDocument:{uri},position:{line:2,character:20}});
  const completion=await request('textDocument/completion',{textDocument:{uri},position:{line:2,character:7}});
