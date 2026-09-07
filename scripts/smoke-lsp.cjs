@@ -8,7 +8,7 @@ function sameFileUri(a,b) {
  } catch { return a===b; }
 }
 async function smoke(server,proxy){
- const root=fs.mkdtempSync(path.join(os.tmpdir(),'lingo-lsp-'));
+ const root=fs.realpathSync.native(fs.mkdtempSync(path.join(process.env.RUNNER_TEMP??os.tmpdir(),'lingo-lsp-')));
  fs.mkdirSync(path.join(root,'src'));
  fs.writeFileSync(path.join(root,'Cargo.toml'),'[package]\nname="lingo_fixture"\nversion="0.1.0"\nedition="2021"\n');
  const source='fn main() {\n    let value: u32 = "bad";\n    println!("{value}");\n}\n';
@@ -29,7 +29,11 @@ async function smoke(server,proxy){
  let diagnostics=[];
  for(let n=0;n<200;n++){if(fatal)throw fatal;diagnostics=notifications.filter(m=>m.method==='textDocument/publishDiagnostics'&&sameFileUri(m.params.uri,uri)).flatMap(m=>m.params.diagnostics);if(diagnostics.some(d=>String(d.code)==='E0308'))break;await delay(150);}
  const mismatch=diagnostics.find(d=>String(d.code)==='E0308');assert.ok(mismatch,'expected real E0308 '+stderr.slice(-1500)+' notifications='+JSON.stringify(notifications.map(m=>({method:m.method,params:m.params}))).slice(-7000));assert.match(mismatch.message,/u32/);assert.match(mismatch.message,/str/);if(proxy)assert.match(mismatch.message,/中文：/);
- const hover=await request('textDocument/hover',{textDocument:{uri},position:{line:2,character:20}});
+ let hover;
+ for(let n=0;n<100;n++) {
+  hover=await request('textDocument/hover',{textDocument:{uri},position:{line:1,character:10}});
+  if(hover)break;await delay(150);
+ }
  const completion=await request('textDocument/completion',{textDocument:{uri},position:{line:2,character:7}});
  const actions=await request('textDocument/codeAction',{textDocument:{uri},range:mismatch.range,context:{diagnostics:[mismatch]}});
  assert.ok(hover,'hover works');assert.ok(completion,'completion works');assert.ok(Array.isArray(actions),'code actions respond');
