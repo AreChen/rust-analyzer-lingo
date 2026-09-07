@@ -1,0 +1,14 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
+const { target, triple, executable } = require('./platform.cjs');
+const root = path.resolve(__dirname, '..');
+const version = require('../package.json').version;
+const manifest = fs.readFileSync(path.join(root, 'proxy/Cargo.toml'), 'utf8');
+if (!manifest.includes(`version = "${version}"`)) throw new Error('TypeScript and Rust versions differ');
+execFileSync('cargo', ['build', '--release', '--locked', '--manifest-path', 'proxy/Cargo.toml', '--target', triple], { cwd: root, stdio: 'inherit' });
+const destination = path.join(root, 'out/bin');
+fs.mkdirSync(destination, { recursive: true });
+fs.copyFileSync(path.join(process.env.CARGO_TARGET_DIR ?? path.join(root, 'proxy/target'), triple, 'release', executable), path.join(destination, executable));
+if (process.platform !== 'win32') fs.chmodSync(path.join(destination, executable), 0o755);
+console.log(`Built ${target}: out/bin/${executable}`);

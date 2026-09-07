@@ -13,3 +13,10 @@ proxy/**
 test-fixture/**
 test-proxy-client.js
 target/**
+
+scripts/**
+
+out/packages/**
+bin/**
+dist/**
+*.vsix

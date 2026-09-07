@@ -1,0 +1,145 @@
+[
+  {
+    "any": [
+      "cannot assign twice to immutable variable",
+      "cannot mutate immutable variable"
+    ],
+    "chinese": "不能再次修改这个不可变变量",
+    "explanation": "如果需要修改它，请在声明时使用 let mut。"
+  },
+  {
+    "any": [
+      "mismatched types"
+    ],
+    "chinese": "实际类型与要求的类型不一致",
+    "explanation": "查看下方 expected 和 found 后面的类型，检查赋值、参数或返回值。"
+  },
+  {
+    "any": [
+      "unused variable"
+    ],
+    "chinese": "变量没有使用",
+    "explanation": "不需要时可以删除；有意保留时，在名称前加下划线。"
+  },
+  {
+    "any": [
+      "unused import"
+    ],
+    "chinese": "导入的内容没有使用",
+    "explanation": "删除不需要的 use 导入，或在代码中使用它。"
+  },
+  {
+    "any": [
+      "variable does not need to be mutable",
+      "unused mut"
+    ],
+    "chinese": "这个变量不需要 mut",
+    "explanation": "变量没有被修改，可以去掉声明中的 mut。"
+  },
+  {
+    "any": [
+      "use of moved value",
+      "borrow of moved value"
+    ],
+    "chinese": "这个值已经被移动",
+    "explanation": "查看值在哪里交给了别处；如果不需要转移所有权，可以改为借用。"
+  },
+  {
+    "any": [
+      "borrowed value does not live long enough"
+    ],
+    "chinese": "引用指向的值过早被释放",
+    "explanation": "确保这个值一直存在，直到引用最后一次使用结束。"
+  },
+  {
+    "any": [
+      "character literal may only contain one codepoint",
+      "invalid literal: morethanonechar"
+    ],
+    "chinese": "单引号里只能放一个字符",
+    "explanation": "多个字符请用双引号写成字符串，例如 \"a2\"。"
+  },
+  {
+    "any": [
+      "expected semicolon",
+      "expected ';'",
+      "expected `;`"
+    ],
+    "chinese": "这里缺少分号",
+    "explanation": "检查这一行的结尾，确认语句是否需要用 ; 结束。"
+  },
+  {
+    "any": [
+      "free constant item without body",
+      "associated constant in `impl` without body",
+      "free static item without body"
+    ],
+    "chinese": "这个常量或静态变量还没有赋值",
+    "explanation": "在声明后补上 = 值，例如 const LIMIT: u32 = 10;。"
+  },
+  {
+    "any": [
+      "free type alias without body",
+      "associated type in `impl` without body"
+    ],
+    "chinese": "还没有指定这里代表的类型",
+    "explanation": "在类型名后补上 = 具体类型，例如 type Item = String;。"
+  },
+  {
+    "any": [
+      "missing structure fields:"
+    ],
+    "chinese": "创建结构体时漏填了字段",
+    "explanation": "根据下方列表补齐字段，也可以查看编辑器提供的快速修复。"
+  },
+  {
+    "any": [
+      "code is inactive due to #[cfg] directives"
+    ],
+    "chinese": "这段代码在当前条件下不参与编译",
+    "explanation": "检查 #[cfg] 条件、目标平台和已启用的 Cargo features；这通常不需要修复。"
+  },
+  {
+    "any": [
+      "this file is not included in any crates",
+      "this file is not included anywhere in the module tree"
+    ],
+    "chinese": "这个文件还没有加入 Rust 项目",
+    "explanation": "确认打开了包含 Cargo.toml 的项目，并在父模块中用 mod 声明这个文件。"
+  },
+  {
+    "any": [
+      "expected due to this"
+    ],
+    "chinese": "这个位置决定了期望的类型",
+    "explanation": "对照这个位置的类型声明，检查实际传入或赋予的值。"
+  },
+  {
+    "any": [
+      "original diagnostic"
+    ],
+    "chinese": "最初报告问题的位置",
+    "explanation": "查看这个位置的完整诊断和代码上下文。"
+  },
+  {
+    "any": [
+      "immutable borrow occurs here"
+    ],
+    "chinese": "这里创建了只读借用",
+    "explanation": "这次借用结束前，不能再通过可变借用修改同一个值。"
+  },
+  {
+    "any": [
+      "mutable borrow occurs here"
+    ],
+    "chinese": "这里创建了可变借用",
+    "explanation": "同一个值在同一时间只能有一个可变借用。"
+  },
+  {
+    "any": [
+      "borrow later used here"
+    ],
+    "chinese": "这里还在使用先前的借用",
+    "explanation": "借用至少会持续到这次使用结束。"
+  }
+]

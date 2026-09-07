@@ -1,145 +1,129 @@
-<p align="right">
-  <a href="../README.md">English</a>
-  ·
-  <strong>简体中文</strong>
-</p>
+# Rust 中文诊断 · Lingo
 
-# rust-analyzer-lingo
+用中文看懂 Rust 的错误和警告，同时保留具体类型、变量名和编译器原文。
 
-一个面向 VS Code 的 Rust 多语言诊断辅助扩展。当前版本重点支持简体中文，后续会继续加入英语和更多语言。
+[English](../README.md)
 
-它不会替换 `rust-analyzer`、`rustc` 或 Clippy，而是在原有诊断之上增加更容易理解的中文解释，同时保留错误代码、源代码位置、严重级别、Rust 关键字和变量名。
+## 安装后怎么用
 
-## 主要功能
+1. 安装官方 **rust-analyzer** 扩展和 Rust 工具链。
+2. 在 VS Code 执行 **Extensions: Install from VSIX...**，选择本扩展的 VSIX。
+3. 打开 Rust 项目。有支持的错误或警告时，代码行尾会自动出现简短中文提示。
+4. 鼠标移到提示上，查看完整说明；点击状态栏的 **Rust 中文**，可以切换显示位置或解释光标处的问题。
 
-- 将 Rust 错误代码和常见编译器消息转换为简洁的中文提示。
-- 收录当前稳定版 Rust 错误索引中的全部 518 个错误代码页面；已经废弃或仅供编译器内部使用的代码也会保留，并明确标注状态。
-- 支持行内提示、扩展自己的 Hover，以及 Problems 面板中的中文诊断。
-- 原始诊断不会被删除，方便对照官方编译器信息。
-- Windows x64 提供原生 LSP 代理，可以把 `rust-analyzer` 自己的诊断 Hover 也翻译成中文。
-- 诊断传输层与语言内容分离，为未来增加多国语言预留空间。
+需要 VS Code 1.90 或更新版本。目前的翻译语言是简体中文。
 
-## 使用要求
+## 提示怎么看
 
-- VS Code 1.90 或更高版本。
-- 官方 [rust-analyzer 扩展](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)。
-- 已安装 Rust 工具链，并且 `rustc`、`cargo` 可以在终端中使用。
-- 原生 Hover 替换目前只支持 Windows x64；行内提示、扩展 Hover 和 Problems 面板不依赖原生代理。
+例如，代码要求 `u32`，实际却给了 `&str`，行尾会显示类似：
 
-## 安装
-
-### 安装 VSIX
-
-可以在 VS Code 命令面板中选择 **Extensions: Install from VSIX...**，然后选择项目生成的 VSIX 文件。
-
-也可以在终端执行：
-
-```powershell
-code --install-extension .\rust-analyzer-lingo-0.1.4.vsix --force
+```text
+错误：需要 `u32`，实际是 `&str` · 另 1 条
 ```
 
-### 从源码构建
+悬停卡片按以下顺序展示：
 
-```powershell
-npm install
-cargo build --release --manifest-path proxy\Cargo.toml
-Copy-Item proxy\target\release\rust-analyzer-lingo-proxy.exe bin\rust-analyzer-lingo-proxy.exe -Force
-npm run package
-```
+- **错误或警告、错误码**：先知道问题的严重程度。
+- **中文概述**：尽量保留具体类型和名称，不只说“类型不匹配”。
+- **可以这样检查**：给出下一步检查方向。
+- **编译器原文、相关位置**：完整保留原始细节，需要时可以核对。
 
-生成的文件名为 `rust-analyzer-lingo-0.1.4.vsix`。
+同一行有多个问题时，先显示最严重的一条，其他问题放在同一张卡片里。状态栏的数量只统计已有中文解释的问题，原始 Problems 面板仍是查看全部诊断的入口。
 
-## 基本使用
+## 选择适合你的显示方式
 
-打开一个有错误的 Rust 文件。默认的 `inline` 模式会在错误所在行末尾添加一条紧凑的中文提示。鼠标悬停在提示上可以查看完整解释，原始的 `rust-analyzer` 或 `rustc` 诊断仍然保留。
+点击状态栏 **Rust 中文 → 切换中文提示的位置**，也可以从命令面板执行 **Rust 中文诊断：切换显示方式**。
 
-在 VS Code 设置中搜索 `rust-analyzer-lingo`，或者直接编辑 `settings.json`：
-
-```json
-{
-  "rust-analyzer-lingo.mode": "inline",
-  "rust-analyzer-lingo.showFallback": false,
-  "rust-analyzer-lingo.inlineTextMaxLength": 32
-}
-```
-
-### 显示模式
-
-| 模式 | 作用 |
+| 显示方式 | 适合什么情况 |
 | --- | --- |
-| `inline` | 在错误所在行旁边显示紧凑中文提示。 |
-| `hover` | 使用扩展自己的 Hover 显示中文解释。 |
-| `problems` | 在 Problems 面板追加中文诊断。 |
-| `both` | 同时启用扩展 Hover 和 Problems 中文诊断。 |
+| **行尾提示**，默认推荐 | 想直接看到问题；悬停提示可看详情。 |
+| **悬停解释** | 想保持编辑区清爽；鼠标移到错误处再查看。 |
+| **问题面板** | 想在 Problems 中集中查看中文条目；原始条目也会保留，所以会看到两组诊断。 |
+| **悬停与问题面板** | 同时使用后两种方式。 |
 
-### 其他设置
+设置中的 `rust-analyzer-lingo.inlineTextMaxLength` 控制中文概述长度，默认 32 个字符。严重程度和其他问题数量会另行显示，不会因为概述截断而消失。
 
-| 设置 | 默认值 | 作用 |
-| --- | --- | --- |
-| `rust-analyzer-lingo.showFallback` | `false` | 没有词典条目或消息规则时，是否显示通用中文说明。 |
-| `rust-analyzer-lingo.inlineTextMaxLength` | `32` | 限制行内提示的可见长度；完整内容仍可通过 Hover 查看。 |
+未收录的诊断默认不会额外显示通用中文提示。可以打开 `rust-analyzer-lingo.showFallback`，也可以执行 **解释光标处的问题** 查看原文。
 
-### 命令面板
+## 让原始诊断也显示中文
 
-- **Rust 中文诊断：解释当前错误**：解释光标所在位置的 Rust 诊断。
-- **Rust 中文诊断：启用原生 Hover 中文替换**：让内置 Windows x64 代理接管 `rust-analyzer` 的服务器路径。
-- **Rust 中文诊断：恢复原生 Hover**：恢复启用代理前保存的服务器路径和环境变量。
+这是一项可选功能，支持 **Windows、macOS、Linux 的 x64 / ARM64**，包括 Alpine Linux。需要先打开并信任项目文件夹，并安装与扩展运行环境对应的 VSIX。
 
-启用原生 Hover 时，扩展会修改当前工作区或全局的 `rust-analyzer` 设置，并在扩展状态中保存原配置。它还会启用原始 rustc 诊断代码，避免官方客户端把代码替换成硬编码的英文链接文字。诊断来源名称会跟随 VS Code 当前的界面语言，未匹配的语言使用英文中性名称。旧版 `rust-analyzer` 可能需要手动执行 **Rust Analyzer: Restart Server**。
+在状态栏菜单选择 **在原始诊断中显示中文**。扩展会检查服务器能否启动，保存当前项目的设置，再重新连接 rust-analyzer。之后，原生错误悬停和原始 Problems 条目中会包含中文说明及原文。
 
-## 错误代码词典
+这个功能与前面的四种显示方式分开控制。它只翻译能识别的诊断，不认识的内容保持原样。普通函数文档、代码补全、跳转和快速修复照常工作。
 
-词典位于 [`src/error-codes.ts`](../src/error-codes.ts)。当前覆盖本机稳定 Rust 工具链 `share/doc/rust/html/error_codes` 目录中的 518 个 `E####` 页面。这里的 518 项是官方错误索引页面总数，不等于“当前编译器仍会主动发出的 518 种错误”：其中包含历史遗留代码和编译器内部代码。
+如果你指定了自己的 rust-analyzer 服务器，会继续使用它；否则会检查项目工具链配置，再使用官方扩展附带的服务器。新版本不会修改全局设置，也不会改动 `diagnostics.useRustcErrorCode`。
 
-每条词典内容都尽量保留 Rust 的技术术语、代码片段和错误代码，避免中文翻译让用户无法回到官方文档或搜索结果。更新 Rust 工具链后，应重新对照本机错误索引检查总数、缺失项、重复项和多余项。
+不想继续使用时，选择 **恢复原始诊断**。扩展会恢复对应项目原先的设置；启用期间你自己修改过的服务器路径和其他环境变量会保留。
 
-## 工作原理
+## 升级官方扩展后需要做什么
 
-扩展层读取 VS Code 已经收到的 Rust 诊断，按照错误代码和常见英文消息匹配中文内容，然后把结果放到行内提示、Hover 或 Problems 面板中。原生 Hover 模式下，Windows x64 Rust 代理使用标准 LSP 转发无关消息，翻译诊断及已支持的 Hover 元数据，并通过 `RUST_ANALYZER_LINGO_REAL_SERVER` 找到真正的 `rust-analyzer` 可执行文件。
+已由新版管理的连接，会在打开 VS Code、激活扩展或检测到扩展变化时检查。没有人为改动的连接会更新到当前应使用的服务器，代理文件也保存在扩展存储目录中，避免旧扩展目录清理后立即失效。
 
-## 开发
+本版验证了官方 **0.3.3033** 和 **0.3.3041**，并针对 0.3.3041 新增的常量、静态变量和关联类型缺少定义等诊断补充中文说明。未来新增但尚未收录的消息会保留原文，不会被替换成没有细节的占位文字。
+
+如果升级后提示无法启动，可以先选择 **恢复原始诊断**，确认官方 rust-analyzer 能正常运行，再重新启用中文显示。
+
+### 从 0.1.x 升级
+
+旧版把不同项目的设置共用同一份备份，无法自动确认那份备份属于哪个项目。
+
+如果看到旧版配置提示，请执行 **恢复原始诊断**，核对对话框显示的服务器路径，确认这是你原先的设置后再恢复，然后重新启用。取消不会修改设置。如果旧版修改的是全局配置，对话框会明确写出“全局”。旧备份会保留，以便其他尚未迁移的项目使用。
+
+## 常见问题
+
+**没有看到中文提示**
+
+先确认官方 rust-analyzer 已经产生诊断，再查看当前显示方式。未知诊断默认不会额外生成提示；原文仍可在 Problems 中查看。如果 VS Code 关闭了 Inlay Hints，请重新开启，或切换到“悬停解释”。
+
+**出现了重复的 Problems 条目**
+
+“问题面板”和“悬停与问题面板”会追加中文诊断，原始诊断不能由本扩展删除。可以改用“行尾提示”或“悬停解释”。
+
+**错误代码变成了英文链接文字**
+
+某些官方扩展版本会把错误码显示成链接标签。本版能从常见的新旧 Rust 官方链接中识别 `E####`，不需要为此修改 rust-analyzer 的全局设置。
+
+**启用原始诊断中文显示失败**
+
+错误信息会说明下一步。常见原因是没有打开项目、项目未受信任、服务器路径失效或当前平台没有原生代理。失败前的设置会尽量回滚；仍可使用不依赖代理的显示方式。
+
+## 开发与验证
+
+在项目根目录执行：
 
 ```powershell
-npm install
-npm run check
-npm run compile
-cargo check --manifest-path proxy\Cargo.toml
-cargo build --release --manifest-path proxy\Cargo.toml
-Copy-Item proxy\target\release\rust-analyzer-lingo-proxy.exe bin\rust-analyzer-lingo-proxy.exe -Force
-npm run package
+rtk npm ci
+rtk npm run check
+rtk npm test
+rtk cargo test --manifest-path proxy/Cargo.toml
+rtk npm run check:catalog
+rtk npm run package
 ```
 
-生成的 `dist/`、`proxy/target/`、`node_modules/` 和 VSIX 文件都是构建产物，不要当作源文件提交。
+打包命令会自动重建当前平台的原生代理、编译扩展和生成共享 JSON 词典，输出 `out/packages/rust-analyzer-lingo-0.3.0-<平台>.vsix`。需要 Node.js 22+ 和 stable Rust。
 
-## GitHub 自动构建与发版
+测试包括配置隔离和恢复、保留用户修改、原文与具体类型、未知诊断、LSP 分帧、诊断部分结果及进程退出。另有真实服务器联调脚本 `scripts/smoke-lsp.cjs` 和 VS Code 扩展宿主测试 `test/extension-host.cjs`。错误码检查会对照本机 stable 工具链，报告条目数、缺失、重复和多余的键。
 
-工作流位于 [`.github/workflows/release.yml`](../.github/workflows/release.yml)。Pull Request 和推送到 `main` 时，GitHub Actions 会在 Windows x64 环境中：
+提交问题时，请附上本扩展版本、官方 rust-analyzer 版本、显示方式、原始诊断和能复现的简短 Rust 代码：[问题反馈](https://github.com/AreChen/rust-analyzer-lingo/issues)。
 
-1. 安装 Node.js 和稳定版 Rust。
-2. 编译原生 LSP 代理。
-3. 执行 TypeScript 检查。
-4. 生成 VSIX 并保存为工作流 Artifact。
+## 平台选择与项目目录
 
-需要正式发版时，让 Git 标签版本与 `package.json` 中的版本一致，然后推送标签：
+| 使用环境 | 下载文件名中的平台 |
+| --- | --- |
+| Windows Intel / AMD、ARM64 | `win32-x64`、`win32-arm64` |
+| macOS Intel、Apple 芯片 | `darwin-x64`、`darwin-arm64` |
+| Linux GNU x64、ARM64 | `linux-x64`、`linux-arm64` |
+| Alpine Linux x64、ARM64 | `alpine-x64`、`alpine-arm64` |
 
-```powershell
-git tag v0.1.4
-git push origin v0.1.4
-```
+使用 SSH、WSL、容器时，按远端扩展宿主的系统选择。Linux GNU 包在 Ubuntu 22.04 上构建；Alpine 使用静态 musl 代理。本次不提供 32 位 ARM、32 位 Windows 或 Web 浏览器版本。
 
-推送 `v*` 标签后，工作流会自动创建 GitHub Release，并把生成的 `rust-analyzer-lingo-0.1.4.vsix` 附加到 Release。也可以在 Actions 页面手动运行工作流；手动运行只构建 Artifact，不会创建 Release。
+- `src/`、`proxy/src/`：扩展和代理源码。
+- `scripts/`、`test/`：构建、校验和回归测试。
+- `out/dist/`：编译后的 JavaScript 和翻译 JSON。
+- `out/bin/`：当前构建平台的代理程序。
+- `out/packages/`：可安装的 VSIX。
+- `proxy/target/`、`node_modules/`：工具默认的构建缓存和依赖目录。
 
-## 后续计划
-
-- 增加语言选择按钮和英语语言包。
-- 在 `docs/` 和扩展翻译资源中加入更多语言。
-- 为 macOS、Linux 等平台提供原生代理。
-- 在保持行内提示简洁的同时，继续补充上下文解释。
-
-## 参与贡献
-
-欢迎提交错误报告和翻译改进。修改词典时，请附上错误代码、使用的 Rust 工具链版本或官方页面，以及翻译措辞的简短理由。提交前请运行 TypeScript 和 Rust 检查。
-
-## 许可证
-
-本项目使用 [MIT License](../LICENSE)。
+所有生成目录都不提交到 Git。GitHub Actions 为八个平台分别构建、运行测试和校验安装包，全部成功后才发布，并附带 `SHA256SUMS` 校验文件。真实官方服务器的 CI 冒烟测试运行于 Windows x64；其他系统尚未自动执行完整 VS Code 图形界面测试。

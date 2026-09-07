@@ -2,91 +2,100 @@ name: Build and Release
 
 on:
   push:
-    branches:
-      - main
-    tags:
-      - "v*"
+    branches: [main]
+    tags: ["v*"]
   pull_request:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
-    name: Build Windows x64 VSIX
-    runs-on: windows-latest
-
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: win32-x64, os: windows-latest, triple: x86_64-pc-windows-msvc}
+          - {target: win32-arm64, os: windows-11-arm, triple: aarch64-pc-windows-msvc}
+          - {target: darwin-x64, os: macos-15-intel, triple: x86_64-apple-darwin}
+          - {target: darwin-arm64, os: macos-15, triple: aarch64-apple-darwin}
+          - {target: linux-x64, os: ubuntu-22.04, triple: x86_64-unknown-linux-gnu}
+          - {target: linux-arm64, os: ubuntu-22.04-arm, triple: aarch64-unknown-linux-gnu}
+          - {target: alpine-x64, os: ubuntu-22.04, triple: x86_64-unknown-linux-musl}
+          - {target: alpine-arm64, os: ubuntu-22.04-arm, triple: aarch64-unknown-linux-musl}
+    env:
+      VSCE_TARGET: ${{ matrix.target }}
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
     steps:
-      - name: Check out source
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-
-      - name: Set up stable Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install JavaScript dependencies
-        run: npm ci
-
-      - name: Check and build native proxy
-        shell: pwsh
-        run: |
-          cargo check --manifest-path proxy\Cargo.toml
-          cargo build --release --manifest-path proxy\Cargo.toml
-          Copy-Item `
-            -LiteralPath 'proxy\target\release\rust-analyzer-lingo-proxy.exe' `
-            -Destination 'bin\rust-analyzer-lingo-proxy.exe' `
-            -Force
-
-      - name: Check TypeScript
-        run: npm run check
-
-      - name: Package VSIX
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rust-docs, rustfmt
+          targets: ${{ matrix.triple }}
+      - name: Install musl linker
+        if: startsWith(matrix.target, 'alpine-')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: npm ci
+      - run: npm run check
+      - run: npm run check:catalog
+      - run: cargo fmt --check --manifest-path proxy/Cargo.toml
+      - run: cargo test --locked --manifest-path proxy/Cargo.toml --target ${{ matrix.triple }}
+      - run: npm test
+      - name: Build, package and inspect platform VSIX
         run: npm run package
-
-      - name: Verify package version and VSIX
+      - name: Test the packaged release binary
+        shell: bash
+        run: |
+          if [[ "$VSCE_TARGET" == win32-* ]]; then suffix=.exe; else suffix=; fi
+          LINGO_TEST_PROXY="$PWD/out/bin/rust-analyzer-lingo-proxy$suffix" node --test test/proxy.test.cjs
+      - name: Smoke test current official rust-analyzer
+        if: matrix.target == 'win32-x64'
         shell: pwsh
         env:
-          REF_NAME: ${{ github.ref_name }}
-          REF_TYPE: ${{ github.ref_type }}
+          LINGO_TEST_MISSING_BODY: "1"
+          GH_TOKEN: ${{ github.token }}
         run: |
-          $manifest = Get-Content -Raw -LiteralPath 'package.json' | ConvertFrom-Json
-          $vsix = @(Get-ChildItem -LiteralPath '.' -Filter '*.vsix')
-
-          if ($vsix.Count -ne 1) {
-            throw "Expected exactly one VSIX, found $($vsix.Count)."
-          }
-
-          if ($env:REF_TYPE -eq 'tag') {
-            $tagVersion = $env:REF_NAME -replace '^v', ''
-            if ($manifest.version -ne $tagVersion) {
-              throw "Git tag $($env:REF_NAME) does not match package.json version $($manifest.version)."
-            }
-          }
-
-      - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
+          $testDir = Join-Path $env:RUNNER_TEMP 'lingo-ra'
+          New-Item -ItemType Directory -Force -Path $testDir | Out-Null
+          gh release download 2026-09-07 --repo rust-lang/rust-analyzer --pattern rust-analyzer-x86_64-pc-windows-msvc.zip --dir $testDir
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Expand-Archive -LiteralPath (Join-Path $testDir 'rust-analyzer-x86_64-pc-windows-msvc.zip') -DestinationPath $testDir
+          node scripts/smoke-lsp.cjs (Join-Path $testDir 'rust-analyzer.exe') (Join-Path $PWD 'out/bin/rust-analyzer-lingo-proxy.exe')
+      - uses: actions/upload-artifact@v4
         with:
-          name: rust-analyzer-lingo-vsix
-          path: "*.vsix"
+          name: vsix-${{ matrix.target }}
+          path: out/packages/*.vsix
           if-no-files-found: error
 
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        shell: pwsh
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: vsix-*
+          path: out/packages
+          merge-multiple: true
+      - name: Validate the complete release and generate checksums
+        run: node scripts/release-assets.cjs
+      - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           REF_NAME: ${{ github.ref_name }}
-        run: |
-          $vsix = Get-ChildItem -LiteralPath '.' -Filter '*.vsix' | Select-Object -First 1
-          gh release create $env:REF_NAME $vsix.FullName `
-            --repo $env:GITHUB_REPOSITORY `
-            --title "rust-analyzer-lingo $env:REF_NAME" `
-            --generate-notes
+        run: gh release create "$REF_NAME" out/packages/*.vsix out/packages/SHA256SUMS --verify-tag --title "rust-analyzer-lingo $REF_NAME" --notes-file docs/release-notes.md

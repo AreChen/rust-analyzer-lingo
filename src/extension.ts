@@ -1,16 +1,13 @@
 import * as vscode from "vscode";
-import * as fs from "node:fs";
-import * as path from "node:path";
+import { isProxy, registerNativeCommands } from "./native";
 import {
   DiagnosticTranslation,
   getDiagnosticCode,
+  originalMessage,
   translateDiagnostic
 } from "./translation";
 
 const EXTENSION_SOURCE = "rust-analyzer-lingo";
-const PREVIOUS_NATIVE_SETTINGS_KEY = "previousNativeHoverSettings";
-const REAL_SERVER_ENV = "RUST_ANALYZER_LINGO_REAL_SERVER";
-const LOCALE_ENV = "RUST_ANALYZER_LINGO_LOCALE";
 const RUST_DIAGNOSTIC_SOURCES = new Set([
   "rust-analyzer",
   "rustc",
@@ -28,12 +25,6 @@ interface ExtensionSettings {
 interface TranslatedDiagnostic {
   original: vscode.Diagnostic;
   translation: DiagnosticTranslation;
-}
-
-interface PreviousNativeSettings {
-  serverPath: string | null;
-  extraEnv: Record<string, string> | null;
-  useRustcErrorCode?: boolean;
 }
 
 function getDiagnosticSourceLabel(language = vscode.env.language): string {
@@ -63,137 +54,8 @@ function getDiagnosticSourceLabel(language = vscode.env.language): string {
   return labels.find(([prefix]) => locale.startsWith(prefix))?.[1] ?? "Rust Diagnostics";
 }
 
-function getWorkspaceConfigurationTarget(): vscode.ConfigurationTarget {
-  return vscode.workspace.workspaceFile || vscode.workspace.workspaceFolders?.length
-    ? vscode.ConfigurationTarget.Workspace
-    : vscode.ConfigurationTarget.Global;
-}
-
-function getProxyPath(context: vscode.ExtensionContext): string | undefined {
-  if (process.platform !== "win32") {
-    return undefined;
-  }
-
-  const proxyPath = path.join(
-    context.extensionPath,
-    "bin",
-    "rust-analyzer-lingo-proxy.exe"
-  );
-  return fs.existsSync(proxyPath) ? proxyPath : undefined;
-}
-
-function getBundledRustAnalyzerPath(): string | undefined {
-  const extension = vscode.extensions.getExtension("rust-lang.rust-analyzer");
-  if (!extension) {
-    return undefined;
-  }
-
-  const serverName = process.platform === "win32" ? "rust-analyzer.exe" : "rust-analyzer";
-  const serverPath = path.join(extension.extensionPath, "server", serverName);
-  return fs.existsSync(serverPath) ? serverPath : undefined;
-}
-
-async function restartRustAnalyzer(): Promise<void> {
-  const commands = await vscode.commands.getCommands(true);
-  if (commands.includes("rust-analyzer.restartServer")) {
-    await vscode.commands.executeCommand("rust-analyzer.restartServer");
-    return;
-  }
-
-  void vscode.window.showInformationMessage(
-    "配置已保存。请执行“Rust Analyzer: Restart Server”让原生中文 Hover 生效。"
-  );
-}
-
-async function enableNativeChineseHover(
-  context: vscode.ExtensionContext
-): Promise<void> {
-  const proxyPath = getProxyPath(context);
-  if (!proxyPath) {
-    void vscode.window.showErrorMessage(
-      "当前系统暂未提供 rust-analyzer-lingo 的原生 Hover 代理；目前只支持 Windows x64。"
-    );
-    return;
-  }
-
-  const rustAnalyzer = vscode.workspace.getConfiguration("rust-analyzer");
-  const target = getWorkspaceConfigurationTarget();
-  const previous = context.globalState.get<PreviousNativeSettings>(
-    PREVIOUS_NATIVE_SETTINGS_KEY
-  );
-
-  if (!previous) {
-    await context.globalState.update(PREVIOUS_NATIVE_SETTINGS_KEY, {
-      serverPath: rustAnalyzer.get<string | null>("server.path", null),
-      extraEnv: rustAnalyzer.get<Record<string, string> | null>("server.extraEnv", null),
-      useRustcErrorCode: rustAnalyzer.get<boolean>(
-        "diagnostics.useRustcErrorCode",
-        false
-      )
-    } satisfies PreviousNativeSettings);
-  } else if (previous.useRustcErrorCode === undefined) {
-    await context.globalState.update(PREVIOUS_NATIVE_SETTINGS_KEY, {
-      ...previous,
-      useRustcErrorCode: rustAnalyzer.get<boolean>(
-        "diagnostics.useRustcErrorCode",
-        false
-      )
-    } satisfies PreviousNativeSettings);
-  }
-
-  const extraEnv = {
-    ...(rustAnalyzer.get<Record<string, string> | null>("server.extraEnv", null) ?? {})
-  };
-  extraEnv[LOCALE_ENV] = vscode.env.language;
-  const bundledServerPath = getBundledRustAnalyzerPath();
-  if (bundledServerPath) {
-    extraEnv[REAL_SERVER_ENV] = bundledServerPath;
-  } else {
-    delete extraEnv[REAL_SERVER_ENV];
-  }
-
-  await rustAnalyzer.update("server.extraEnv", extraEnv, target);
-  await rustAnalyzer.update("server.path", proxyPath, target);
-  // rust-analyzer 默认会把诊断代码替换成硬编码的英文链接文本。
-  // 使用原始 rustc 代码后，Hover 会显示 E0308、overflowing_literals 等稳定标识。
-  await rustAnalyzer.update("diagnostics.useRustcErrorCode", true, target);
-  await restartRustAnalyzer();
-
-  void vscode.window.showInformationMessage(
-    "已启用原生 Hover 中文替换。rust-analyzer 的诊断悬停卡片现在会由代理翻译。"
-  );
-}
-
-async function disableNativeChineseHover(
-  context: vscode.ExtensionContext
-): Promise<void> {
-  const previous = context.globalState.get<PreviousNativeSettings>(
-    PREVIOUS_NATIVE_SETTINGS_KEY
-  );
-  if (!previous) {
-    void vscode.window.showInformationMessage("当前没有 rust-analyzer-lingo 保存的原生 Hover 配置。");
-    return;
-  }
-
-  const rustAnalyzer = vscode.workspace.getConfiguration("rust-analyzer");
-  const target = getWorkspaceConfigurationTarget();
-  await rustAnalyzer.update("server.path", previous.serverPath, target);
-  await rustAnalyzer.update("server.extraEnv", previous.extraEnv, target);
-  if (previous.useRustcErrorCode !== undefined) {
-    await rustAnalyzer.update(
-      "diagnostics.useRustcErrorCode",
-      previous.useRustcErrorCode,
-      target
-    );
-  }
-  await context.globalState.update(PREVIOUS_NATIVE_SETTINGS_KEY, undefined);
-  await restartRustAnalyzer();
-
-  void vscode.window.showInformationMessage("已恢复 rust-analyzer 的原始服务器配置。");
-}
-
-function getSettings(): ExtensionSettings {
-  const config = vscode.workspace.getConfiguration(EXTENSION_SOURCE);
+function getSettings(resource?: vscode.Uri): ExtensionSettings {
+  const config = vscode.workspace.getConfiguration(EXTENSION_SOURCE, resource);
   return {
     mode: config.get<DisplayMode>("mode", "inline"),
     showFallback: config.get<boolean>("showFallback", false),
@@ -219,7 +81,7 @@ function truncateText(text: string, maxLength: number): string {
   }
 
   const safeLength = Math.max(4, maxLength);
-  return `${text.slice(0, safeLength - 1)}…`;
+  return `${Array.from(text).slice(0, safeLength - 1).join("")}…`;
 }
 
 function uniqueEntries(
@@ -227,7 +89,7 @@ function uniqueEntries(
 ): TranslatedDiagnostic[] {
   const seen = new Set<string>();
   return entries.filter((entry) => {
-    const key = `${entry.translation.chinese}\n${entry.translation.explanation ?? ""}`;
+    const key = JSON.stringify([entry.original.message, entry.original.code, entry.original.range, entry.original.relatedInformation]);
     if (seen.has(key)) {
       return false;
     }
@@ -273,15 +135,17 @@ function makeChineseMessage(
   const code = getDiagnosticCode(diagnostic);
 
   if (code) {
-    parts.push(`错误代码：${code}`);
+    parts.push(`[${code}]`);
   }
 
-  parts.push(`提示：${translation.chinese}`);
+  parts.push(translation.chinese);
 
   if (translation.explanation && translation.matchedBy !== "fallback") {
-    parts.push(`解释：${translation.explanation}`);
+    parts.push(`可以这样检查：${translation.explanation}`);
   }
 
+  const original = originalMessage(diagnostic.message);
+  if (original !== translation.chinese) parts.push(`原文：${original}`);
   return parts.join("\n");
 }
 
@@ -313,7 +177,9 @@ function makeProblemSignature(
       message: makeChineseMessage(entry.original, entry.translation, settings),
       severity: entry.original.severity,
       source: entry.original.source,
-      code: getDiagnosticCode(entry.original),
+      code: entry.original.code,
+      tags: entry.original.tags,
+      related: entry.original.relatedInformation,
       range: {
         start: [entry.original.range.start.line, entry.original.range.start.character],
         end: [entry.original.range.end.line, entry.original.range.end.character]
@@ -322,35 +188,45 @@ function makeProblemSignature(
   );
 }
 
-function makeTooltip(
-  entries: readonly TranslatedDiagnostic[],
-  settings: ExtensionSettings
-): vscode.MarkdownString {
+function severityLabel(severity: vscode.DiagnosticSeverity): string {
+  return ["错误", "警告", "提示", "建议"][severity] ?? "提示";
+}
+function appendProse(markdown: vscode.MarkdownString, text: string): void {
+  for (const part of text.split(/(`[^`\n]+`)/g)) {
+    if (part.startsWith("`") && part.endsWith("`") && part.length > 2) markdown.appendMarkdown(part);
+    else markdown.appendText(part);
+  }
+}
+function makeTooltip(entries: readonly TranslatedDiagnostic[], _settings: ExtensionSettings): vscode.MarkdownString {
   const markdown = new vscode.MarkdownString();
   markdown.isTrusted = false;
   markdown.supportHtml = false;
-  markdown.appendText(getDiagnosticSourceLabel());
-  markdown.appendMarkdown("\n\n");
-
   entries.forEach((entry, index) => {
-    if (index > 0) {
-      markdown.appendMarkdown("\n---\n\n");
-    }
-
+    if (index) markdown.appendMarkdown("\n\n---\n\n");
     const code = getDiagnosticCode(entry.original);
-    if (code) {
-      markdown.appendText(`错误代码：${code}`);
-      markdown.appendMarkdown("\n\n");
-    }
-
-    markdown.appendText(`提示：${entry.translation.chinese}`);
-
+    markdown.appendMarkdown("### ");
+    markdown.appendText(severityLabel(entry.original.severity) + (code ? ` · ${code}` : ""));
+    markdown.appendMarkdown("\n\n");
+    appendProse(markdown, entry.translation.chinese);
     if (entry.translation.explanation && entry.translation.matchedBy !== "fallback") {
-      markdown.appendMarkdown("\n\n");
-      markdown.appendText(`解释：${entry.translation.explanation}`);
+      markdown.appendMarkdown("\n\n**可以这样检查**\n\n");
+      appendProse(markdown, entry.translation.explanation);
     }
+    const original = originalMessage(entry.original.message);
+    if (original !== entry.translation.chinese) {
+      markdown.appendMarkdown("\n\n**编译器原文**\n\n");
+      markdown.appendText(original);
+    }
+    const related = entry.original.relatedInformation ?? [];
+    if (related.length) {
+      markdown.appendMarkdown("\n\n**相关位置**\n\n");
+      for (const item of related) {
+        markdown.appendText(`${vscode.workspace.asRelativePath(item.location.uri)}:${item.location.range.start.line + 1} — ${item.message}`);
+        markdown.appendMarkdown("\n\n");
+      }
+    }
+    if (code?.match(/^E\d{4}$/)) markdown.appendMarkdown(`\n\n[查看 Rust 官方解释](https://doc.rust-lang.org/error_codes/${code}.html)`);
   });
-
   return markdown;
 }
 
@@ -365,13 +241,13 @@ function makeInlayHint(
     document.lineCount - 1
   );
   const position = new vscode.Position(line, document.lineAt(line).text.length);
-  const first = distinctEntries[0];
+  const first = [...distinctEntries].sort((a, b) => a.original.severity - b.original.severity)[0];
   const additionalCount = distinctEntries.length - 1;
-  const suffix = additionalCount > 0 ? `（另有 ${additionalCount} 条相关提示）` : "";
-  const label = `提示：${first.translation.chinese}${suffix}`;
+  const suffix = additionalCount > 0 ? ` · 另 ${additionalCount} 条` : "";
+  const label = `${severityLabel(first.original.severity)}：${truncateText(first.translation.chinese, settings.inlineTextMaxLength)}${suffix}`;
   const hint = new vscode.InlayHint(
     position,
-    truncateText(label, settings.inlineTextMaxLength),
+    label,
     vscode.InlayHintKind.Type
   );
 
@@ -389,29 +265,79 @@ export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel(EXTENSION_SOURCE);
   const translatedByUri = new Map<string, TranslatedDiagnostic[]>();
   const problemSignatures = new Map<string, string>();
+  const displaySignatures = new Map<string, string>();
+  const pending = new Map<string, vscode.Uri>();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let disposed = false;
 
+  const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 10);
+  status.command = "rustAnalyzerLingo.showMenu";
+  const modeNames: Record<DisplayMode, string> = {inline: "行尾提示", hover: "悬停解释", problems: "问题面板", both: "悬停与问题面板"};
+  const updateStatus = (): void => {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor || editor.document.languageId !== "rust") {status.hide(); return;}
+    const entries = translatedByUri.get(editor.document.uri.toString()) ?? [];
+    const errors = entries.filter(e => e.original.severity === vscode.DiagnosticSeverity.Error).length;
+    const warnings = entries.filter(e => e.original.severity === vscode.DiagnosticSeverity.Warning).length;
+    status.text = `$(comment-discussion) Rust 中文${errors ? ` · $(error) ${errors}` : ""}${warnings ? ` · $(warning) ${warnings}` : ""}`;
+    const native = isProxy(vscode.workspace.getConfiguration("rust-analyzer", editor.document.uri).get("server.path"));
+    status.tooltip = `数量仅统计已有中文解释的问题。当前显示：${modeNames[getSettings(editor.document.uri).mode]}；原始诊断：${native ? "已连接中文代理" : "默认"}。点击切换显示方式、查看解释或设置原始诊断中文显示。`;
+    status.show();
+  };
+  context.subscriptions.push(status, vscode.window.onDidChangeActiveTextEditor(updateStatus),
+    vscode.workspace.onDidOpenTextDocument(doc => {if (doc.languageId === "rust") schedule(doc.uri);}),
+    vscode.commands.registerCommand("rustAnalyzerLingo.showMenu", async () => {
+      const native = isProxy(vscode.workspace.getConfiguration("rust-analyzer", vscode.window.activeTextEditor?.document.uri).get("server.path"));
+      const selected = await vscode.window.showQuickPick([
+        {label: "$(list-selection) 切换中文提示的位置", command: "rustAnalyzerLingo.chooseMode"},
+        {label: "$(info) 解释光标处的问题", command: "rustAnalyzerLingo.explainCurrentDiagnostic"},
+        {label: native ? "$(check) 原始诊断已连接中文代理" : "$(globe) 在原始诊断中显示中文", description: native ? "点击检查或更新连接" : "当前项目", command: "rustAnalyzerLingo.enableNativeChineseHover"},
+        {label: "$(discard) 恢复原始诊断", command: "rustAnalyzerLingo.disableNativeChineseHover"}
+      ], {title: "Rust 中文诊断", placeHolder: "你想做什么？"});
+      if (selected) await vscode.commands.executeCommand(selected.command);
+    }),
+    vscode.commands.registerCommand("rustAnalyzerLingo.chooseMode", async () => {
+      const options: Array<{label: string; description: string; mode: DisplayMode}> = [
+        {label: "行尾提示", description: "推荐：快速看懂问题，悬停查看细节", mode: "inline"},
+        {label: "悬停解释", description: "保持编辑区清爽，鼠标移到错误处查看", mode: "hover"},
+        {label: "问题面板", description: "在 Problems 中追加中文条目，会保留原始条目", mode: "problems"},
+        {label: "悬停与问题面板", description: "同时使用这两种显示方式", mode: "both"}
+      ];
+      const selected = await vscode.window.showQuickPick(options, {title: "中文提示显示在哪里？"});
+      if (selected) {
+        if (!vscode.workspace.workspaceFolders?.length && !vscode.workspace.workspaceFile) {
+          void vscode.window.showInformationMessage("请先打开项目文件夹，再保存显示方式。当前保持原来的显示方式。"); return;
+        }
+        const resource = vscode.window.activeTextEditor?.document.uri;
+        const config = vscode.workspace.getConfiguration(EXTENSION_SOURCE, resource);
+        const target = config.inspect("mode")?.workspaceFolderValue !== undefined ? vscode.ConfigurationTarget.WorkspaceFolder : vscode.ConfigurationTarget.Workspace;
+        await config.update("mode", selected.mode, target);
+      }
+    })
+  );
   const refreshDiagnostics = async (uri: vscode.Uri): Promise<void> => {
     if (uri.scheme !== "file" && uri.scheme !== "untitled") {
       return;
     }
 
-    let document: vscode.TextDocument;
-    try {
-      document = await vscode.workspace.openTextDocument(uri);
-    } catch {
-      return;
+    let document = vscode.workspace.textDocuments.find(doc => doc.uri.toString() === uri.toString());
+    if (!document) {
+      if (!isProblemsMode(getSettings(uri)) || !uri.path.endsWith(".rs") || !vscode.languages.getDiagnostics(uri).some(d => d.source !== EXTENSION_SOURCE && isRustDiagnostic(d))) return;
+      try { document = await vscode.workspace.openTextDocument(uri); } catch { return; }
     }
+    if (disposed) return;
 
     const uriKey = uri.toString();
     if (document.languageId !== "rust") {
       translatedByUri.delete(uriKey);
+      displaySignatures.delete(uriKey);
       problemSignatures.delete(uriKey);
       bilingualDiagnostics.delete(uri);
       inlayHintChanges.fire();
       return;
     }
 
-    const settings = getSettings();
+    const settings = getSettings(uri);
     const entries = vscode.languages
       .getDiagnostics(uri)
       .filter((diagnostic) =>
@@ -425,11 +351,15 @@ export function activate(context: vscode.ExtensionContext): void {
         (entry) => settings.showFallback || entry.translation.matchedBy !== "fallback"
       );
 
+    const signature = makeProblemSignature(entries, settings);
     translatedByUri.set(uriKey, entries);
-    inlayHintChanges.fire();
+    if (displaySignatures.get(uriKey) !== signature) {
+      displaySignatures.set(uriKey, signature);
+      inlayHintChanges.fire();
+    }
+    updateStatus();
 
     if (isProblemsMode(settings)) {
-      const signature = makeProblemSignature(entries, settings);
       if (problemSignatures.get(uriKey) !== signature) {
         bilingualDiagnostics.set(
           uri,
@@ -443,36 +373,46 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   };
 
+  const schedule = (uri: vscode.Uri): void => {
+    pending.set(uri.toString(), uri);
+    if (timer) return;
+    timer = setTimeout(() => {
+      timer = undefined;
+      const batch = [...pending.values()]; pending.clear();
+      void Promise.all(batch.map(refreshDiagnostics)).catch(error => output.appendLine(String(error)));
+    }, 80);
+  };
   const refreshOpenDocuments = (): void => {
     for (const document of vscode.workspace.textDocuments) {
-      void refreshDiagnostics(document.uri);
+      if (document.languageId === "rust") schedule(document.uri);
     }
   };
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("rustAnalyzerLingo.enableNativeChineseHover", () =>
-      enableNativeChineseHover(context)
-    ),
-    vscode.commands.registerCommand("rustAnalyzerLingo.disableNativeChineseHover", () =>
-      disableNativeChineseHover(context)
-    ),
+    ...registerNativeCommands(context, output),
+    {dispose() {disposed = true; if (timer) clearTimeout(timer); pending.clear();}},
     bilingualDiagnostics,
     inlayHintChanges,
     output,
     vscode.languages.onDidChangeDiagnostics((event) => {
       for (const uri of event.uris) {
-        void refreshDiagnostics(uri);
+        schedule(uri);
       }
     }),
     vscode.workspace.onDidCloseTextDocument((document) => {
       const uriKey = document.uri.toString();
       translatedByUri.delete(uriKey);
+      displaySignatures.delete(uriKey);
       problemSignatures.delete(uriKey);
       bilingualDiagnostics.delete(document.uri);
       inlayHintChanges.fire();
     }),
     vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration("rust-analyzer.server")) updateStatus();
       if (event.affectsConfiguration(EXTENSION_SOURCE)) {
+        if (!isProblemsMode(getSettings())) { bilingualDiagnostics.clear(); problemSignatures.clear(); }
+        inlayHintChanges.fire();
+        updateStatus();
         refreshOpenDocuments();
       }
     })
@@ -480,10 +420,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.languages.registerHoverProvider(
-      { language: "rust", scheme: "file" },
+      [{ language: "rust", scheme: "file" }, { language: "rust", scheme: "untitled" }],
       {
         provideHover(document, position): vscode.Hover | undefined {
-          const settings = getSettings();
+          const settings = getSettings(document.uri);
           if (!isHoverMode(settings)) {
             return undefined;
           }
@@ -502,11 +442,11 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.languages.registerInlayHintsProvider(
-      { language: "rust", scheme: "file" },
+      [{ language: "rust", scheme: "file" }, { language: "rust", scheme: "untitled" }],
       {
         onDidChangeInlayHints: inlayHintChanges.event,
         provideInlayHints(document, range): vscode.InlayHint[] {
-          const settings = getSettings();
+          const settings = getSettings(document.uri);
           if (!isInlineMode(settings)) {
             return [];
           }
@@ -546,9 +486,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
         await refreshDiagnostics(editor.document.uri);
 
-        const entries = (translatedByUri.get(editor.document.uri.toString()) ?? []).filter(
-          (entry) => positionMatches(entry.original, editor.selection.active, true)
-        );
+        const entries = vscode.languages.getDiagnostics(editor.document.uri)
+          .filter(d => d.source !== EXTENSION_SOURCE && isRustDiagnostic(d) && positionMatches(d, editor.selection.active, true))
+          .map(original => ({original, translation: translateDiagnostic(original)}));
 
         if (entries.length === 0) {
           void vscode.window.showInformationMessage(
@@ -570,10 +510,11 @@ export function activate(context: vscode.ExtensionContext): void {
           if (code) {
             output.appendLine(`错误代码：${code}`);
           }
-          output.appendLine(`提示：${entry.translation.chinese}`);
+          output.appendLine(entry.translation.chinese);
           if (entry.translation.explanation) {
-            output.appendLine(`解释：${entry.translation.explanation}`);
+            output.appendLine(`可以这样检查：${entry.translation.explanation}`);
           }
+          output.appendLine(`编译器原文：${originalMessage(entry.original.message)}`);
         }
 
         output.show(true);
@@ -581,6 +522,7 @@ export function activate(context: vscode.ExtensionContext): void {
     )
   );
 
+  updateStatus();
   refreshOpenDocuments();
 }
 

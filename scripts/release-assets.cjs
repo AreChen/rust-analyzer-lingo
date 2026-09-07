@@ -1,0 +1,11 @@
+const fs = require('node:fs');
+const crypto = require('node:crypto');
+const { targets } = require('./platform.cjs');
+const { name, version } = require('../package.json');
+if (process.env.GITHUB_REF_NAME !== `v${version}`) throw new Error('Release tag does not match package version');
+const expected = Object.keys(targets).map(target => `${name}-${version}-${target}.vsix`).sort();
+const actual = fs.readdirSync('out/packages').filter(file => file.endsWith('.vsix')).sort();
+if (JSON.stringify(expected) !== JSON.stringify(actual)) throw new Error(`Incomplete release: ${actual.join(', ')}`);
+const checksums = actual.map(file => `${crypto.createHash('sha256').update(fs.readFileSync(`out/packages/${file}`)).digest('hex')}  ${file}`);
+fs.writeFileSync('out/packages/SHA256SUMS', checksums.join('\n') + '\n');
+console.log(`Verified ${actual.length} release packages`);

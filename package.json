@@ -1,8 +1,8 @@
 {
   "name": "rust-analyzer-lingo",
-  "displayName": "rust-analyzer-lingo",
-  "description": "A multilingual diagnostic layer for Rust in VS Code; Chinese is the first locale, with more languages planned.",
-  "version": "0.1.4",
+  "displayName": "Rust 中文诊断 · Lingo",
+  "description": "用中文看懂 Rust 错误和警告：行尾提示、悬停解释、具体类型与修改建议。",
+  "version": "0.3.0",
   "publisher": "rust-analyzer-lingo",
   "license": "MIT",
   "repository": {
@@ -20,22 +20,31 @@
     "Programming Languages"
   ],
   "activationEvents": [
-    "onLanguage:rust"
+    "onLanguage:rust",
+    "onStartupFinished"
   ],
-  "main": "./dist/extension.js",
+  "main": "./out/dist/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "rustAnalyzerLingo.explainCurrentDiagnostic",
-        "title": "Rust 中文诊断：解释当前错误"
+        "title": "Rust 中文诊断：解释光标处的问题"
       },
       {
         "command": "rustAnalyzerLingo.enableNativeChineseHover",
-        "title": "Rust 中文诊断：启用原生 Hover 中文替换"
+        "title": "Rust 中文诊断：在原始诊断中显示中文"
       },
       {
         "command": "rustAnalyzerLingo.disableNativeChineseHover",
-        "title": "Rust 中文诊断：恢复原生 Hover"
+        "title": "Rust 中文诊断：恢复原始诊断"
+      },
+      {
+        "command": "rustAnalyzerLingo.showMenu",
+        "title": "Rust 中文诊断：打开菜单"
+      },
+      {
+        "command": "rustAnalyzerLingo.chooseMode",
+        "title": "Rust 中文诊断：切换显示方式"
       }
     ],
     "menus": {
@@ -53,7 +62,7 @@
       ]
     },
     "configuration": {
-      "title": "rust-analyzer-lingo",
+      "title": "Rust 中文诊断",
       "properties": {
         "rust-analyzer-lingo.mode": {
           "type": "string",
@@ -64,13 +73,13 @@
             "both"
           ],
           "enumDescriptions": [
-            "在错误所在行末尾显示紧凑的中文提示，并将详细中文说明放在提示的悬停卡片中。",
-            "只在鼠标悬停诊断时显示中文解释。",
-            "在 Problems 面板中追加中文诊断，原始诊断仍会保留。",
-            "同时启用悬停解释和 Problems 面板中文诊断。"
+            "推荐：在行尾简短提示问题，鼠标悬停提示可查看详情。",
+            "只在鼠标移到错误处时显示中文解释。",
+            "在问题面板追加中文条目，原始条目也会保留。",
+            "同时显示悬停解释和问题面板中文条目。"
           ],
           "default": "inline",
-          "description": "中文诊断的显示位置。"
+          "description": "中文提示显示在哪里。也可以点击状态栏的“Rust 中文”切换。"
         },
         "rust-analyzer-lingo.showFallback": {
           "type": "boolean",
@@ -81,21 +90,37 @@
           "type": "integer",
           "minimum": 8,
           "default": 32,
-          "description": "行内中文提示的最大显示长度；完整内容仍可通过悬停提示查看。"
+          "description": "行尾中文概述最多显示多少个字符；严重程度和同一行的其他问题数量会另行显示，悬停可看完整内容。"
         }
       }
     }
   },
   "scripts": {
-    "compile": "tsc -p ./",
+    "compile": "tsc -p ./ && node scripts/build-catalog.cjs",
     "watch": "tsc -p ./ --watch",
     "check": "tsc --noEmit -p ./",
-    "package": "npm run compile && vsce package"
+    "package": "npm run build:proxy && npm run compile && node scripts/package.cjs",
+    "test": "npm run compile && cargo build --manifest-path proxy/Cargo.toml && node --test test/*.test.cjs",
+    "check:catalog": "node scripts/check-catalog.cjs",
+    "build:proxy": "node scripts/build-proxy.cjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/vscode": "^1.90.0",
     "@vscode/vsce": "^3.6.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "yauzl": "^3.4.0"
+  },
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "virtualWorkspaces": {
+      "supported": false
+    },
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "不受信任的项目可以查看中文提示；启用原始诊断中文显示需要信任项目。"
+    }
   }
 }
