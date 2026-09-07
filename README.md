@@ -119,7 +119,7 @@ CI builds and tests all eight targets on native x64 / ARM64 runners (musl target
 - `proxy/src/`: LSP transport and contextual native translation.
 - `.github/workflows/release.yml`: regression tests, a pinned real-server smoke test, VSIX content checks, and tag-based releases.
 
-To release, match the Git tag to `package.json` and `proxy/Cargo.toml` (for example `v0.3.0`). CI validates the tag and attaches the VSIX to a GitHub Release. Generated dependencies, `out/`, `proxy/target/`, and VSIX files are not source files. Native binaries are built by CI and are not tracked in Git.
+To release, match the Git tag to `package.json` and `proxy/Cargo.toml` (for example `v0.3.1`). CI validates the tag, attaches the eight VSIX packages to a GitHub Release, and dispatches **Sync VS Code Marketplace**. Once its workload identity is configured, that workflow validates and uploads the same packages to Marketplace, skipping platform versions already published. See [publishing setup, dry runs and retries](docs/marketplace-publishing.md). Generated dependencies, `out/`, `proxy/target/`, and VSIX files are not source files. Native binaries are built by CI and are not tracked in Git.
 
 [Report a problem](https://github.com/AreChen/rust-analyzer-lingo/issues). Include the extension and rust-analyzer versions, display mode, original diagnostic, and a small Rust example when possible.
 

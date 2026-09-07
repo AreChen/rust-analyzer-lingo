@@ -1,0 +1,59 @@
+name: Sync VS Code Marketplace
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing stable GitHub Release tag (for example v0.3.1)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Validate packages without signing in or publishing'
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marketplace-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'AreChen/rust-analyzer-lingo' && (github.event_name == 'release' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-22.04
+    environment: marketplace
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      # Release assets are data. Execute publishing code from the maintained branch.
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Download and validate every release package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/marketplace.cjs download
+      - name: Sign in using GitHub workload identity
+        if: ${{ !inputs.dry_run }}
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.MARKETPLACE_AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.MARKETPLACE_AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+      - name: Publish missing platform versions
+        if: ${{ !inputs.dry_run }}
+        run: node scripts/marketplace.cjs publish

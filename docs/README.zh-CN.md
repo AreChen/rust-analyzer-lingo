@@ -133,3 +133,7 @@ rtk npm run package
 - `proxy/target/`、`node_modules/`：工具默认的构建缓存和依赖目录。
 
 所有生成目录都不提交到 Git。GitHub Actions 为八个平台分别构建、运行测试和校验安装包，全部成功后才发布，并附带 `SHA256SUMS` 校验文件。真实官方服务器的 CI 冒烟测试运行于 Windows x64；其他系统尚未自动执行完整 VS Code 图形界面测试。
+
+GitHub Release 创建成功后会启动 **Sync VS Code Marketplace**。完成一次发布身份配置后，该流程会校验八个平台安装包的哈希、版本、发布者和平台标识，再把同一批文件上传到 VS Code 市场。已存在的平台版本会跳过，失败可重新运行。市场上传结果需在该独立工作流中查看；上传后还可能等待市场验证。
+
+如需补发已有版本，在 GitHub Actions 选择 **Sync VS Code Marketplace → Run workflow**，分支选 `main`，填写如 `v0.3.1` 的标签。勾选 `dry_run` 只校验、不上传。发布身份和重试说明见[自动发布配置](marketplace-publishing.md)。

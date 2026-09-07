@@ -77,6 +77,7 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -94,3 +95,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REF_NAME: ${{ github.ref_name }}
         run: gh release create "$REF_NAME" out/packages/*.vsix out/packages/SHA256SUMS --verify-tag --title "rust-analyzer-lingo $REF_NAME" --notes-file docs/release-notes.md
+      # GITHUB_TOKEN-created releases do not emit another Actions release run.
+      - name: Start Marketplace synchronization
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh workflow run marketplace.yml --ref main -f "tag=$RELEASE_TAG"
