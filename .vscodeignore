@@ -1,6 +1,7 @@
 .vscode/**
 .vscode-test/**
 .github/**
+.cargo/**
 src/**
 test/**
 node_modules/**

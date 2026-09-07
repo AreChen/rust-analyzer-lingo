@@ -29,8 +29,6 @@ jobs:
           - {target: alpine-arm64, os: ubuntu-22.04-arm, triple: aarch64-unknown-linux-musl}
     env:
       VSCE_TARGET: ${{ matrix.target }}
-      CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
-      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -41,9 +39,6 @@ jobs:
         with:
           components: rust-docs, rustfmt
           targets: ${{ matrix.triple }}
-      - name: Install musl linker
-        if: startsWith(matrix.target, 'alpine-')
-        run: sudo apt-get update && sudo apt-get install -y musl-tools
       - run: npm ci
       - run: npm run check
       - run: npm run check:catalog

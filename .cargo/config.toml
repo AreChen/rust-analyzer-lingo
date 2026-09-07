@@ -1,0 +1,9 @@
+# Use one matching set of startup objects and libc from Rust's sysroot.
+# Mixing these with a distro musl-gcc can produce an executable that crashes before main.
+[target.x86_64-unknown-linux-musl]
+linker = "rust-lld"
+rustflags = ["-C", "link-self-contained=yes"]
+
+[target.aarch64-unknown-linux-musl]
+linker = "rust-lld"
+rustflags = ["-C", "link-self-contained=yes"]
