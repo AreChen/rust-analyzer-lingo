@@ -10,7 +10,7 @@ Use a Microsoft Entra application with a federated credential:
 - Subject: `repo:AreChen/rust-analyzer-lingo:environment:marketplace`
 - Audience: `api://AzureADTokenExchange`
 
-Authorize its service principal as a Contributor on the `rust-analyzer-lingo` Marketplace publisher. This does not require an Azure subscription role. Configure GitHub environment `marketplace` with the non-secret variables `MARKETPLACE_AZURE_CLIENT_ID` and `MARKETPLACE_AZURE_TENANT_ID`. Restrict environment deployment branches to `main` and the `v*` release tags. No client secret or PAT is required. See Microsoft's [automated publishing documentation](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#secure-automated-publishing-to-visual-studio-marketplace).
+Configure GitHub environment `marketplace` with the non-secret variables `MARKETPLACE_AZURE_CLIENT_ID` and `MARKETPLACE_AZURE_TENANT_ID`. Restrict environment deployment branches to `main` and the `v*` release tags. Run the workflow once and copy the profile ID printed by **Identify Marketplace publishing principal**. Add that ID as a Contributor on the `rust-analyzer-lingo` Marketplace publisher, then retry the workflow. The first upload is expected to fail until this membership exists. The profile ID is not the application's client ID or Entra object ID. This does not require an Azure subscription role. No client secret or PAT is required. See Microsoft's [automated publishing documentation](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#secure-automated-publishing-to-visual-studio-marketplace).
 
 The workflow uses the released `vsce --azure-credential` support through `azure/login`. It does not depend on the unreleased direct `vsce --oidc` option.
 
