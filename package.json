@@ -2,7 +2,7 @@
   "name": "rust-analyzer-lingo",
   "displayName": "Rust 中文诊断 · Lingo",
   "description": "用中文看懂 Rust 错误和警告：行尾提示、悬停解释、具体类型与修改建议。",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "rust-analyzer-lingo",
   "license": "MIT",
   "repository": {
@@ -122,5 +122,18 @@
       "supported": "limited",
       "description": "不受信任的项目可以查看中文提示；启用原始诊断中文显示需要信任项目。"
     }
+  },
+  "icon": "assets/icon.png",
+  "keywords": [
+    "rust",
+    "rust-analyzer",
+    "Chinese",
+    "中文",
+    "diagnostics",
+    "translation"
+  ],
+  "galleryBanner": {
+    "color": "#0c1b41",
+    "theme": "dark"
   }
 }

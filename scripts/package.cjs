@@ -9,7 +9,7 @@ const destination = `out/packages/${name}-${version}-${target}.vsix`;
 execFileSync(process.execPath, [path.join(path.dirname(require.resolve('@vscode/vsce/package.json')), 'vsce'), 'package', '--target', target, '--out', destination], { stdio: 'inherit' });
 require('yauzl').open(destination, { lazyEntries: true }, (error, zip) => {
   if (error) throw error;
-  const required = new Set(['extension/package.json', 'extension.vsixmanifest', `extension/out/bin/${executable}`, ...['extension.js', 'native.js', 'catalog.json', 'diagnostic-details.json', 'message-rules.json'].map(f => `extension/out/dist/${f}`)]);
+  const required = new Set(['extension/package.json', 'extension/assets/icon.png', 'extension/changelog.md', 'extension.vsixmanifest', `extension/out/bin/${executable}`, ...['extension.js', 'native.js', 'catalog.json', 'diagnostic-details.json', 'message-rules.json'].map(f => `extension/out/dist/${f}`)]);
   zip.on('error', error => { throw error; });
   zip.on('entry', entry => {
     required.delete(entry.fileName);

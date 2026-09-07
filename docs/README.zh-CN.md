@@ -2,12 +2,18 @@
 
 用中文看懂 Rust 的错误和警告，同时保留具体类型、变量名和编译器原文。
 
-[English](../README.md)
+[English](../README.md) · [版本记录](../CHANGELOG.md) · [反馈与支持](../SUPPORT.md)
+
+本扩展是配合官方 rust-analyzer 使用的独立辅助工具，与 Rust 官方、rust-analyzer 官方没有隶属关系。
+
+![中文提示、具体类型和编译器原文的使用示意](images/diagnostic-guide.png)
+
+*使用示意图，非编辑器截图。*
 
 ## 安装后怎么用
 
 1. 安装官方 **rust-analyzer** 扩展和 Rust 工具链。
-2. 在 VS Code 执行 **Extensions: Install from VSIX...**，选择本扩展的 VSIX。
+2. 安装 **Rust 中文诊断 · Lingo**，扩展 ID 为 `rust-analyzer-lingo.rust-analyzer-lingo`。手动安装时，在 VS Code 执行 **Extensions: Install from VSIX...**，选择对应平台的 VSIX。
 3. 打开 Rust 项目。有支持的错误或警告时，代码行尾会自动出现简短中文提示。
 4. 鼠标移到提示上，查看完整说明；点击状态栏的 **Rust 中文**，可以切换显示位置或解释光标处的问题。
 
@@ -102,7 +108,7 @@ rtk npm run check:catalog
 rtk npm run package
 ```
 
-打包命令会自动重建当前平台的原生代理、编译扩展和生成共享 JSON 词典，输出 `out/packages/rust-analyzer-lingo-0.3.0-<平台>.vsix`。需要 Node.js 22+ 和 stable Rust。
+打包命令会自动重建当前平台的原生代理、编译扩展和生成共享 JSON 词典，输出 `out/packages/rust-analyzer-lingo-0.3.1-<平台>.vsix`。需要 Node.js 22+ 和 stable Rust。
 
 测试包括配置隔离和恢复、保留用户修改、原文与具体类型、未知诊断、LSP 分帧、诊断部分结果及进程退出。另有真实服务器联调脚本 `scripts/smoke-lsp.cjs` 和 VS Code 扩展宿主测试 `test/extension-host.cjs`。错误码检查会对照本机 stable 工具链，报告条目数、缺失、重复和多余的键。
 

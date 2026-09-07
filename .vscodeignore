@@ -18,6 +18,7 @@ target/**
 scripts/**
 
 out/packages/**
+out/artwork/**
 bin/**
 dist/**
 *.vsix

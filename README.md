@@ -2,12 +2,18 @@
 
 Read Rust errors and warnings in Simplified Chinese, with the original compiler details one hover away.
 
-[简体中文使用说明](docs/README.zh-CN.md)
+[简体中文使用说明](docs/README.zh-CN.md) · [Changelog](CHANGELOG.md) · [Support](SUPPORT.md)
+
+An independent companion to the official rust-analyzer extension. This project is not affiliated with the Rust or rust-analyzer teams.
+
+![Feature illustration: inline Chinese explanation, concrete types, and the original diagnostic](docs/images/diagnostic-guide.png)
+
+*Feature illustration, not an editor screenshot.*
 
 ## Start using it
 
 1. Install the official [rust-analyzer extension](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer) and a Rust toolchain.
-2. Download the [release VSIX](https://github.com/AreChen/rust-analyzer-lingo/releases/latest) matching the extension host platform and install it through **Extensions: Install from VSIX...**.
+2. Install **Rust 中文诊断 · Lingo**, extension ID `rust-analyzer-lingo.rust-analyzer-lingo`. For manual installation, download the [release VSIX](https://github.com/AreChen/rust-analyzer-lingo/releases/latest) matching the extension host platform and use **Extensions: Install from VSIX...**.
 3. Open a Rust project. A short Chinese explanation appears at the end of a line with a supported diagnostic. Hover it for details.
 4. Click **Rust 中文** in the status bar to change the display mode or explain the problem at the cursor.
 
@@ -68,7 +74,7 @@ rtk npm run check:catalog
 rtk npm run package
 ```
 
-Packaging rebuilds the host-platform Rust proxy into `out/bin/`, compiles TypeScript and the shared catalog into `out/dist/`, and creates `out/packages/rust-analyzer-lingo-0.3.0-<platform>.vsix`. It checks that the TypeScript and Rust package versions agree. No manual executable copy is needed.
+Packaging rebuilds the host-platform Rust proxy into `out/bin/`, compiles TypeScript and the shared catalog into `out/dist/`, and creates `out/packages/rust-analyzer-lingo-0.3.1-<platform>.vsix`. It checks that the TypeScript and Rust package versions agree. No manual executable copy is needed.
 
 The regression suite covers configuration restoration, translation context, unknown diagnostics, framing, progress reports, process cleanup, and unchanged non-diagnostic traffic. The catalog checker compares all `E####.html` pages in the local stable toolchain with the source catalog, including retired entries.
 
