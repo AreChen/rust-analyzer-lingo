@@ -98,6 +98,8 @@ async function main() {
   await validatePackages(directory, tag);
   if (command === 'publish') {
     const vsce = path.join(path.dirname(require.resolve('@vscode/vsce/package.json')), 'vsce');
+    // Duplicate packages can be read publicly; verify membership even on a no-op retry.
+    execFileSync(process.execPath, [vsce, 'verify-pat', publisher, '--azure-credential'], { stdio: 'inherit' });
     for (const { file } of expectedPackages(tag)) {
       for (let attempt = 1; ; attempt++) {
         try {
