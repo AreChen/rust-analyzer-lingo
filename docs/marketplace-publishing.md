@@ -7,8 +7,10 @@ The `Sync VS Code Marketplace` workflow downloads all eight VSIX packages from a
 Use a Microsoft Entra application with a federated credential:
 
 - Issuer: `https://token.actions.githubusercontent.com`
-- Subject: `repo:AreChen/rust-analyzer-lingo:environment:marketplace`
+- Subject: `repo:AreChen@20765464/rust-analyzer-lingo@1327756196:environment:marketplace`
 - Audience: `api://AzureADTokenExchange`
+
+This repository uses GitHub's immutable-ID subject format. When configuring another repository, use the actual subject shown by the Azure login step; do not omit the account/repository IDs when that format is enabled.
 
 Configure GitHub environment `marketplace` with the non-secret variables `MARKETPLACE_AZURE_CLIENT_ID` and `MARKETPLACE_AZURE_TENANT_ID`. Restrict environment deployment branches to `main` and the `v*` release tags. Run the workflow once and copy the profile ID printed by **Identify Marketplace publishing principal**. Add that ID as a Contributor on the `rust-analyzer-lingo` Marketplace publisher, then retry the workflow. The first upload is expected to fail until this membership exists. The profile ID is not the application's client ID or Entra object ID. This does not require an Azure subscription role. No client secret or PAT is required. See Microsoft's [automated publishing documentation](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#secure-automated-publishing-to-visual-studio-marketplace).
 
